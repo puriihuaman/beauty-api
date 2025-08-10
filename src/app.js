@@ -17,6 +17,10 @@ const capitalizeFirstLetter = (text) => {
 	return cleanText.charAt(0).toUpperCase().concat(cleanText.slice(1));
 };
 
+const formatText = (text) => {
+	return text.trim().replaceAll(/[^a-zA-Z0-9-]/g, "-");
+};
+
 // CATALOG
 // ---------------------------------
 app.get(`/webhook/catalogs`, async (req, res) => {
@@ -25,7 +29,7 @@ app.get(`/webhook/catalogs`, async (req, res) => {
 			database_id: process.env.NOTION_CATALOGS_DB_ID,
 		});
 
-		res.json({ message: "Todos los catálogos", data: response.results });
+		res.json({ message: `Todos los catálogos`, data: response.results });
 	} catch (error) {
 		res.status(500).json({ error: error.message });
 	}
@@ -35,11 +39,13 @@ app.get(`/webhook/catalogs/:id`, async (req, res) => {
 	try {
 		const id = req.params.id;
 		if (!id) {
-			return res.status(400).json({ error: "El ID del catálogo requerido." });
+			return res
+				.status(400)
+				.json({ error: `El ID del catálogo es requerido.` });
 		}
 
 		const response = await notion.pages.retrieve({ page_id: id });
-		res.json({ message: "Catálogo recuperado", data: response });
+		res.json({ message: `Catálogo recuperado`, data: response });
 	} catch (error) {
 		res.status(500).json({ error: error.message });
 	}
@@ -153,6 +159,156 @@ app.delete(`/webhook/catalogs/delete/:id`, async (req, res) => {
 		});
 
 		res.json({ message: `Catálogo eliminado.`, data: response });
+	} catch (error) {
+		res.status(500).json({ error: error.message });
+	}
+});
+
+// ---------------------------------
+
+// CAMPAIGN
+// ---------------------------------
+app.get(`/webhook/campaigns`, async (req, res) => {
+	try {
+		const response = await notion.databases.query({
+			database_id: process.env.NOTION_CAMPAIGN_DB_ID,
+		});
+		res.json({ message: `Todas las campañas`, data: response.results });
+	} catch (error) {
+		res.status(500).json({ error: error.message });
+	}
+});
+
+app.get(`/webhook/campaigns/:id`, async (req, res) => {
+	try {
+		const id = req.params.id;
+		if (!id) {
+			return res
+				.status(400)
+				.json({ error: `El ID de la campaña es requerido.` });
+		}
+		const response = await notion.pages.retrieve({ page_id: id });
+		res.json({ message: `Campaña recuperada.`, data: response });
+	} catch (error) {
+		res.status(500).json({ error: error.message });
+	}
+});
+
+app.post(`/webhook/campaigns/create`, async (req, res) => {
+	try {
+		const { name, startDate, endDate } = req.body;
+		const cleanName = name.trim();
+
+		if (!cleanName || !startDate || !endDate) {
+			return res.status(400).json({
+				error: `El nombre, fecha de inicio y fecha de fin de la campaña son requeridos.`,
+			});
+		}
+
+		const existing = await notion.databases.query({
+			database_id: process.env.NOTION_CAMPAIGN_DB_ID,
+			filter: {
+				property: `NAME`,
+				title: { equals: formatText(cleanName) },
+			},
+		});
+
+		if (existing.results.length > 0) {
+			return res.status(409).json({ error: `La campaña ya existe.` });
+		}
+		const now = new Date().toISOString();
+		const response = await notion.pages.create({
+			parent: { database_id: process.env.NOTION_CAMPAIGN_DB_ID },
+			properties: {
+				NAME: { title: [{ text: { content: formatText(cleanName) } }] },
+				START_DATE: { date: { start: startDate } },
+				END_DATE: { date: { start: endDate } },
+				CREATED_AT: { date: { start: now } },
+				UPDATED_AT: { date: { start: now } },
+			},
+		});
+
+		res.json({ message: `Campaña creada.`, data: response });
+	} catch (error) {
+		res.status(500).json({ error: error.message });
+	}
+});
+
+app.put(`/webhook/campaigns/update/:id`, async (req, res) => {
+	try {
+		const { name, startDate, endDate } = req.body;
+		const id = req.params.id;
+		const cleanName = name.trim();
+
+		if (!cleanName || !startDate || !endDate) {
+			return res.status(400).json({
+				error: `Nombre, fecha de inicio, fecha de fin son requeridos.`,
+			});
+		}
+
+		if (cleanName.length > 20) {
+			return res
+				.status(400)
+				.json({ error: `El nombre de la campaña es demasiado largo.` });
+		}
+		let currentCampaign = null;
+		try {
+			currentCampaign = await notion.pages.retrieve({ page_id: id });
+		} catch (error) {
+			return res.status(404).json({ erro: `No existe la campaña.` });
+		}
+
+		const existing = await notion.databases.query({
+			database_id: process.env.NOTION_CAMPAIGN_DB_ID,
+			filter: {
+				property: `NAME`,
+				title: { equals: cleanName },
+			},
+		});
+
+		if (existing.results.length > 0) {
+			return res
+				.status(409)
+				.json({ error: `Ya existe un catálogo con este nombre.` });
+		}
+		const now = new Date().toISOString();
+		const response = await notion.pages.update({
+			page_id: id,
+			properties: {
+				NAME: { title: [{ text: { content: formatText(cleanName) } }] },
+				START_DATE: { date: { start: startDate } },
+				END_DATE: { date: { start: endDate } },
+				UPDATED_AT: { date: { start: now } },
+			},
+		});
+
+		res.json({ message: `Campaña actualizada exitosamente.`, data: response });
+	} catch (error) {
+		res.status(500).json({ error: error.message });
+	}
+});
+
+app.delete(`/webhook/campaigns/delete/:id`, async (req, res) => {
+	try {
+		const id = req.params.id;
+
+		if (!id || !id.trim()) {
+			return res
+				.status(400)
+				.json({ error: `El ID de la campaña es requerido.` });
+		}
+		const responseCurrent = await notion.pages.retrieve({ page_id: id });
+
+		if (!responseCurrent)
+			return res.status(404).json({ error: `No existe la campaña` });
+
+		const response = await notion.pages.update({
+			page_id: id,
+			archived: true,
+			in_trash: true,
+		});
+
+		res.json({ message: `Campaña eliminada exitosamente.`, data: response });
 	} catch (error) {
 		res.status(500).json({ error: error.message });
 	}
