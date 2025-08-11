@@ -171,7 +171,7 @@ app.delete(`/webhook/catalogs/delete/:id`, async (req, res) => {
 app.get(`/webhook/campaigns`, async (req, res) => {
 	try {
 		const response = await notion.databases.query({
-			database_id: process.env.NOTION_CAMPAIGN_DB_ID,
+			database_id: process.env.NOTION_CAMPAIGNS_DB_ID,
 		});
 		res.json({ message: `Todas las campañas`, data: response.results });
 	} catch (error) {
@@ -206,7 +206,7 @@ app.post(`/webhook/campaigns/create`, async (req, res) => {
 		}
 
 		const existing = await notion.databases.query({
-			database_id: process.env.NOTION_CAMPAIGN_DB_ID,
+			database_id: process.env.NOTION_CAMPAIGNS_DB_ID,
 			filter: {
 				property: `NAME`,
 				title: { equals: formatText(cleanName) },
@@ -218,7 +218,7 @@ app.post(`/webhook/campaigns/create`, async (req, res) => {
 		}
 		const now = new Date().toISOString();
 		const response = await notion.pages.create({
-			parent: { database_id: process.env.NOTION_CAMPAIGN_DB_ID },
+			parent: { database_id: process.env.NOTION_CAMPAIGNS_DB_ID },
 			properties: {
 				NAME: { title: [{ text: { content: formatText(cleanName) } }] },
 				START_DATE: { date: { start: startDate } },
@@ -259,7 +259,7 @@ app.put(`/webhook/campaigns/update/:id`, async (req, res) => {
 		}
 
 		const existing = await notion.databases.query({
-			database_id: process.env.NOTION_CAMPAIGN_DB_ID,
+			database_id: process.env.NOTION_CAMPAIGNS_DB_ID,
 			filter: {
 				property: `NAME`,
 				title: { equals: cleanName },
@@ -313,6 +313,89 @@ app.delete(`/webhook/campaigns/delete/:id`, async (req, res) => {
 		res.status(500).json({ error: error.message });
 	}
 });
+
+// ---------------------------------
+
+// CATALOG_CAMPAIGN
+// ---------------------------------
+
+app.get(`/webhook/catalog-campaign`, async (req, res) => {
+	try {
+		const response = await notion.databases.query({
+			database_id: process.env.NOTION_CATALOG_CAMPAIGN_DB_ID,
+		});
+
+		res.json({
+			message: `Todas la relaciones de catálogo y campañas`,
+			data: response.results,
+		});
+	} catch (error) {
+		res.status(500).json({ error: error.message });
+	}
+});
+
+app.get(`/webhook/catalog-campaign/:id`, async (req, res) => {
+	try {
+		const id = req.params.id;
+		if (!id || !id.trim()) {
+			return res
+				.status(400)
+				.json({ error: `El ID de catálogo compaña es requerido` });
+		}
+		const response = await notion.pages.retrieve({ page_id: id });
+		res.json({ message: `Catálogo compaña recuperada`, data: response });
+	} catch (error) {
+		res.status(500).json({ error: error.message });
+	}
+});
+
+app.post(`/webhook/catalog-campaign/create`, async (req, res) => {
+	try {
+		// id, fecha creación, fecha de actualización, id campaña, id catalogo
+		const { id_campaign, id_catalog } = req.body;
+
+		if (!id_campaign || !id_catalog) {
+			return res.status(400).json({
+				error: `El ID de la campaña y del catálogo son requeridos.`,
+			});
+		}
+
+		let currentCampaign;
+		try {
+			currentCampaign = await notion.pages.retrieve({ page_id: id_campaign });
+		} catch (error) {
+			res.status(404).json({ error: `Campaña no encontrada.` });
+		}
+
+		let currentCatalog;
+		try {
+			currentCatalog = await notion.pages.retrieve({ page_id: id_catalog });
+		} catch (error) {
+			res.status(404).json({ error: `Catálogo no encontrado.` });
+		}
+
+		const now = new Date().toISOString();
+		const uuid = crypto.randomUUID();
+		const response = await notion.pages.create({
+			parent: { database_id: process.env.NOTION_CATALOG_CAMPAIGN_DB_ID },
+			properties: {
+				ID: { title: [{ text: { content: uuid } }] },
+				CAMPAIGN: { relation: [{ id: currentCampaign.id }] },
+				CATALOG: { relation: [{ id: currentCatalog.id }] },
+				CREATED_AT: { date: { start: now } },
+				UPDATED_AT: { date: { start: now } },
+			},
+		});
+
+		res.json({ message: `Catálogo campaña`, data: response });
+	} catch (error) {
+		res.status(500).json({ error: error.message });
+	}
+});
+
+app.put(`/webhook/catalog-campaign/update/:id`, async (req, res) => {});
+
+app.delete(`/webhook/catalog-campaign/delete/:id`, async (req, res) => {});
 
 // ---------------------------------
 
