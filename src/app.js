@@ -2,7 +2,7 @@ require("dotenv").config();
 
 const { Client } = require("@notionhq/client");
 const express = require("express");
-
+// 0
 const app = express();
 
 const PORT = 3000;
@@ -395,7 +395,30 @@ app.post(`/webhook/catalog-campaign/create`, async (req, res) => {
 
 app.put(`/webhook/catalog-campaign/update/:id`, async (req, res) => {});
 
-app.delete(`/webhook/catalog-campaign/delete/:id`, async (req, res) => {});
+app.delete(`/webhook/catalog-campaign/delete/:id`, async (req, res) => {
+	try {
+		const id = req.params.id.trim();
+		if (!id) {
+			return res.status(400).json({ error: `El ID es requerido.` });
+		}
+		const responseCurrent = await notion.pages.retrieve({ page_id: id });
+
+		if (!responseCurrent) {
+			return res.status(404).json({ error: `Catalogo campana no encontrado.` });
+		}
+		const response = await notion.pages.update({
+			page_id: id,
+			archived: true,
+			in_trash: true,
+		});
+		res.json({
+			message: `Catalogo campana eliminado exitosamente.`,
+			data: response,
+		});
+	} catch (error) {
+		res.status(500).json({ error: error.message });
+	}
+});
 
 // ---------------------------------
 
