@@ -23,6 +23,12 @@ module.exports = {
 	deleteCampaignCatalog: require("./catalogCampaignController")
 		.deleteCampaignCatalog,
 
+	getAllCustomer: require("./customerController").getAllCustomer,
+	getCustomerById: require("./customerController").getCustomerById,
+	createCustomer: require("./customerController").createCustomer,
+	updateCustomer: require("./customerController").updateCustomer,
+	deleteCustomer: require("./customerController").deleteCustomer,
+
 	getAllProducts: require("./productController").getAllProducts,
 	getProductById: require("./productController").getProductById,
 	createProduct: require("./productController").createProduct,
