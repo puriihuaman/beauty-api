@@ -9,12 +9,15 @@ const {
 	productRouter,
 	orderRouter,
 } = require("./routes/v1");
+const { corsMiddleware } = require("./config");
 
 const app = express();
 
 const PORT = 3000;
 const HOSTNAME = `localhost`;
 
+app.disable("x-powered-by");
+app.use(corsMiddleware);
 app.use(express.json());
 
 const CONTEXT_PATH = `/api/v1/webhook`;
