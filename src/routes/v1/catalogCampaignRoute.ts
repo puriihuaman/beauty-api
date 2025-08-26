@@ -1,13 +1,13 @@
-const express = require("express");
-const {
-	deleteCampaignCatalog,
-	updateCampaignCatalog,
+import {
 	createCampaignCatalog,
-	getCampaignCatalogById,
+	deleteCampaignCatalog,
 	getAllCampaignCatalogs,
-} = require("../../controllers");
+	getCampaignCatalogById,
+	updateCampaignCatalog,
+} from "@controllers/index.ts";
+import { Router } from "express";
 
-const catalogCampaignRouter = express.Router();
+const catalogCampaignRouter = Router();
 
 catalogCampaignRouter.get(`/`, getAllCampaignCatalogs);
 
@@ -19,4 +19,4 @@ catalogCampaignRouter.put(`/update/:id`, updateCampaignCatalog);
 
 catalogCampaignRouter.delete(`/delete/:id`, deleteCampaignCatalog);
 
-module.exports = catalogCampaignRouter;
+export { catalogCampaignRouter };

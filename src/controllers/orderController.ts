@@ -1,28 +1,32 @@
+import type { Request, Response } from "express";
+
 const { Client } = require("@notionhq/client");
 
 const notion = new Client({ auth: process.env.NOTION_TOKEN });
 
-const getAllOrders = async (req, res) => {
+const getAllOrders = async (req: Request, res: Response) => {
 	try {
 		const response = await notion.databases.query({
 			database_id: process.env.DB_ID_ORDERS,
 		});
 		res.json(response.results);
 	} catch (error) {
-		res.status(500).json({ error: error.message });
+		const errorMessage = error instanceof Error ? error.message : String(error);
+		res.status(500).json({ error: errorMessage });
 	}
 };
 
-const getOrderById = async (req, res) => {
+const getOrderById = async (req: Request, res: Response) => {
 	try {
 		const response = await notion.pages.retrieve({ page_id: req.params.id });
 		res.json(response);
 	} catch (error) {
-		res.status(500).json({ error: error.message });
+		const errorMessage = error instanceof Error ? error.message : String(error);
+		res.status(500).json({ error: errorMessage });
 	}
 };
 
-const createOrder = async (req, res) => {
+const createOrder = async (req: Request, res: Response) => {
 	try {
 		const body = req.body;
 		const { customer, products } = body;
@@ -77,7 +81,8 @@ const createOrder = async (req, res) => {
 
 		res.json({ message: "Agregado a Notion", data: response });
 	} catch (error) {
-		res.status(500).json({ error: error.message });
+		const errorMessage = error instanceof Error ? error.message : String(error);
+		res.status(500).json({ error: errorMessage });
 	}
 
 	// Si falla la creación del pedido o de algún producto:
@@ -85,7 +90,7 @@ const createOrder = async (req, res) => {
 	// Si falla la creación del pedido, recorre esos IDs y archívalos con notion.pages.update({ page_id, archived: true }).
 };
 
-const createNewOrder = async (req, res) => {
+const createNewOrder = async (req: Request, res: Response) => {
 	try {
 		const id = req.params.id;
 		const { products } = req.body;
@@ -125,11 +130,11 @@ const createNewOrder = async (req, res) => {
 		}
 
 		const properties = {};
-		properties.Product = {
-			relation: [...order.properties.Product.relation, ...relations],
-		};
-		properties.Total = { number: order.properties.Total.number + total };
-		properties.Updated_at = { date: { start: now } };
+		// properties.Product = {
+		// 	relation: [...order.properties.Product.relation, ...relations],
+		// };
+		// properties.Total = { number: order.properties.Total.number + total };
+		// properties.Updated_at = { date: { start: now } };
 
 		const response = await notion.pages.update({
 			page_id: id,
@@ -138,15 +143,16 @@ const createNewOrder = async (req, res) => {
 
 		res.json({ message: "Agregando mas productos a Notion", data: response });
 	} catch (error) {
-		res.status(500).json({ error: error.message });
+		const errorMessage = error instanceof Error ? error.message : String(error);
+		res.status(500).json({ error: errorMessage });
 	}
 };
 
-const updateOrder = async (req, res) => {};
+const updateOrder = async (req: Request, res: Response) => {};
 
-const deleteOrder = async (req, res) => {};
+const deleteOrder = async (req: Request, res: Response) => {};
 
-module.exports = {
+export {
 	getAllOrders,
 	getOrderById,
 	createOrder,

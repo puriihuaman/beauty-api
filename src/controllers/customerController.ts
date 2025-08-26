@@ -1,7 +1,8 @@
-const { Client } = require("@notionhq/client");
-const { capitalizeFirstLetter } = require("../utils/capitalize-first-letter");
+import { Client } from "@notionhq/client";
+import type { Request, Response } from "express";
+import { capitalizeFirstLetter } from "../utils/capitalizeFirstLetter.ts";
 
-const notion = new Client({ auth: process.env.NOTION_TOKEN });
+const notion = new Client({ auth: process.env.NOTION_TOKEN as string });
 
 const NOTION_PROPERTIES = {
 	NAME: `NAME`,
@@ -9,10 +10,10 @@ const NOTION_PROPERTIES = {
 	UPDATED_AT: `UPDATED_AT`,
 };
 
-const getAllCustomer = async (req, res) => {
+const getAllCustomer = async (req: Request, res: Response) => {
 	try {
 		const response = await notion.databases.query({
-			database_id: process.env.NOTION_CUSTOMER_DB_ID,
+			database_id: process.env.NOTION_CUSTOMER_DB_ID as string,
 		});
 		res.json({ message: `Todos los clientes`, data: response.results });
 	} catch (error) {
@@ -20,7 +21,7 @@ const getAllCustomer = async (req, res) => {
 	}
 };
 
-const getCustomerById = async (req, res) => {
+const getCustomerById = async (req: Request, res: Response) => {
 	try {
 		const id = req.params.id.trim();
 		const notionIdRegex =
@@ -35,7 +36,6 @@ const getCustomerById = async (req, res) => {
 		}
 		const response = await notion.pages.retrieve({
 			page_id: id,
-			auth: process.env.NOTION_TOKEN,
 		});
 
 		res.json({ message: `Cliente recuperado.`, data: response });
@@ -65,7 +65,7 @@ const getCustomerById = async (req, res) => {
 	}
 };
 
-const createCustomer = async (req, res) => {
+const createCustomer = async (req: Request, res: Response) => {
 	try {
 		if (!req.body || Object.keys(req.body).length === 0) {
 			return res
@@ -86,7 +86,7 @@ const createCustomer = async (req, res) => {
 				.json({ error: `El nombre del cliente es demasiado largo.` });
 
 		const existingCustomer = await notion.databases.query({
-			database_id: process.env.NOTION_CUSTOMER_DB_ID,
+			database_id: process.env.NOTION_CUSTOMER_DB_ID as string,
 			filter: {
 				property: NOTION_PROPERTIES.NAME,
 				title: { equals: cleanName },
@@ -98,7 +98,7 @@ const createCustomer = async (req, res) => {
 		}
 		const currentTime = new Date().toISOString();
 		const response = await notion.pages.create({
-			parent: { database_id: process.env.NOTION_CUSTOMER_DB_ID },
+			parent: { database_id: process.env.NOTION_CUSTOMER_DB_ID as string },
 			properties: {
 				[NOTION_PROPERTIES.NAME]: {
 					title: [{ text: { content: capitalizeFirstLetter(cleanName) } }],
@@ -131,7 +131,7 @@ const createCustomer = async (req, res) => {
 	}
 };
 
-const updateCustomer = async (req, res) => {
+const updateCustomer = async (req: Request, res: Response) => {
 	try {
 		const { name } = req.body;
 		const id = req.params.id;
@@ -207,7 +207,7 @@ const updateCustomer = async (req, res) => {
 	}
 };
 
-const deleteCustomer = async (req, res) => {
+const deleteCustomer = async (req: Request, res: Response) => {
 	try {
 		const id = req.params.id;
 		const cleanId = id.trim();
@@ -255,10 +255,10 @@ const deleteCustomer = async (req, res) => {
 	}
 };
 
-module.exports = {
+export {
+	createCustomer,
+	deleteCustomer,
 	getAllCustomer,
 	getCustomerById,
-	createCustomer,
 	updateCustomer,
-	deleteCustomer,
 };

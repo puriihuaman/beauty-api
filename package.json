@@ -2,10 +2,12 @@
 	"name": "beauty-api",
 	"version": "1.0.0",
 	"description": "",
-	"main": "index.js",
-	"type": "commonjs",
+	"main": "app.ts",
+	"type": "module",
 	"scripts": {
-		"dev": "node -r dotenv/config ./src/app.js"
+		"dev": "nodemon",
+		"build": "rimraf ./dist && tsc",
+		"start": "npm run build && node dist/app.js"
 	},
 	"dependencies": {
 		"@notionhq/client": "4.0.1",
@@ -24,5 +26,16 @@
 	"bugs": {
 		"url": "https://github.com/puriihuaman/beauty-api/issues"
 	},
-	"homepage": "https://github.com/puriihuaman/beauty-api#readme"
+	"homepage": "https://github.com/puriihuaman/beauty-api#readme",
+	"devDependencies": {
+		"@types/cors": "2.8.19",
+		"@types/express": "5.0.3",
+		"@types/node": "24.3.0",
+		"cross-env": "10.0.0",
+		"nodemon": "3.1.10",
+		"rimraf": "6.0.1",
+		"ts-node": "10.9.2",
+		"tsconfig-paths": "4.2.0",
+		"typescript": "5.9.2"
+	}
 }
