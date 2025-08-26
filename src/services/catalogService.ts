@@ -6,9 +6,9 @@ import {
 	type PartialDatabaseObjectResponse,
 	type PartialPageObjectResponse,
 } from "@notionhq/client";
-import type { CatalogModel } from "../domain/model/catalogModel.ts";
-import type { CatalogRequestDto } from "../domain/dto/request/catalogRequestDto.ts";
-import { ClientError } from "../utils/exception.ts";
+import type { CatalogRequestDto } from "../domain/dto/index.ts";
+import type { CatalogModel } from "../domain/model/index.ts";
+import { ClientError } from "../utils/index.ts";
 
 const notion = new Client({ auth: process.env.NOTION_TOKEN as string });
 
