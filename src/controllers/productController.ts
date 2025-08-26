@@ -1,3 +1,5 @@
+import type { Request, Response } from "express";
+
 const { Client } = require("@notionhq/client");
 const { capitalizeFirstLetter } = require("../utils/capitalize-first-letter");
 
@@ -12,7 +14,7 @@ const PRODUCT_PROPERTIES = {
 	UPDATED_AT: `UPDATED_AT`,
 };
 
-const getAllProducts = async (req, res) => {
+const getAllProducts = async (req: Request, res: Response) => {
 	try {
 		const response = await notion.databases.query({
 			database_id: process.env.NOTION_PRODUCTS_DB_ID,
@@ -23,7 +25,7 @@ const getAllProducts = async (req, res) => {
 	}
 };
 
-const getProductById = async (req, res) => {
+const getProductById = async (req: Request, res: Response) => {
 	try {
 		const id = req.params.id.trim();
 
@@ -69,7 +71,7 @@ const getProductById = async (req, res) => {
 	}
 };
 
-const createProduct = async (req, res) => {
+const createProduct = async (req: Request, res: Response) => {
 	try {
 		if (!req.body || Object.keys(req.body).length === 0) {
 			return res
@@ -153,7 +155,7 @@ const createProduct = async (req, res) => {
 	}
 };
 
-const updateProduct = async (req, res) => {
+const updateProduct = async (req: Request, res: Response) => {
 	try {
 		if (!req.body || Object.keys(req.body).length === 0) {
 			return res
@@ -255,7 +257,7 @@ const updateProduct = async (req, res) => {
 	}
 };
 
-const deleteProduct = async (req, res) => {
+const deleteProduct = async (req: Request, res: Response) => {
 	try {
 		const productId = req.params.id.trim();
 
@@ -303,7 +305,7 @@ const deleteProduct = async (req, res) => {
 	}
 };
 
-module.exports = {
+export {
 	getAllProducts,
 	getProductById,
 	createProduct,

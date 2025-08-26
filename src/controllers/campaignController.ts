@@ -1,9 +1,11 @@
+import type { Request, Response } from "express";
+
 const { Client } = require("@notionhq/client");
 const { formatCampaignName } = require("../utils/format-campaign-name");
 
 const notion = new Client({ auth: process.env.NOTION_TOKEN });
 
-const getAllCampaigns = async (req, res) => {
+const getAllCampaigns = async (req: Request, res: Response) => {
 	try {
 		const response = await notion.databases.query({
 			database_id: process.env.NOTION_CAMPAIGNS_DB_ID,
@@ -14,7 +16,7 @@ const getAllCampaigns = async (req, res) => {
 	}
 };
 
-const getCampaignById = async (req, res) => {
+const getCampaignById = async (req: Request, res: Response) => {
 	try {
 		const id = req.params.id;
 		if (!id) {
@@ -29,7 +31,7 @@ const getCampaignById = async (req, res) => {
 	}
 };
 
-const createCampaign = async (req, res) => {
+const createCampaign = async (req: Request, res: Response) => {
 	try {
 		const { name, startDate, endDate } = req.body;
 		const cleanName = name.trim();
@@ -69,7 +71,7 @@ const createCampaign = async (req, res) => {
 	}
 };
 
-const updateCampaign = async (req, res) => {
+const updateCampaign = async (req: Request, res: Response) => {
 	try {
 		const { name, startDate, endDate } = req.body;
 		const id = req.params.id;
@@ -123,7 +125,7 @@ const updateCampaign = async (req, res) => {
 	}
 };
 
-const deleteCampaign = async (req, res) => {
+const deleteCampaign = async (req: Request, res: Response) => {
 	try {
 		const id = req.params.id;
 
