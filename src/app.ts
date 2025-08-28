@@ -3,7 +3,11 @@ import "./config/index.ts";
 import type { NextFunction, Request, Response } from "express";
 import express, { json } from "express";
 import { corsMiddleware } from "./middleware/index.ts";
-import { campaignRouter, catalogRouter } from "./routes/v1/index.ts";
+import {
+	campaignRouter,
+	catalogCampaignRouter,
+	catalogRouter,
+} from "./routes/v1/index.ts";
 import { ClientError, handleError, ServerError } from "./utils/index.ts";
 
 const app = express();
@@ -19,7 +23,7 @@ const CONTEXT_PATH = `/api/v1/webhook`;
 
 app.use(`${CONTEXT_PATH}/catalogs`, catalogRouter);
 app.use(`${CONTEXT_PATH}/campaigns`, campaignRouter);
-// app.use(`${CONTEXT_PATH}/catalog-campaign`, catalogCampaignRouter);
+app.use(`${CONTEXT_PATH}/catalog-campaign`, catalogCampaignRouter);
 // app.use(`${CONTEXT_PATH}/customers`, customerRouter);
 // app.use(`${CONTEXT_PATH}/products`, productRouter);
 // app.use(`${CONTEXT_PATH}/orders`, orderRouter);
