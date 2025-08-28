@@ -1,114 +1,124 @@
 import type { Request, Response } from "express";
+import type { CatalogCampaignDto } from "../domain/dto/index.ts";
+import {
+	addCatalogCampaign,
+	getAllCatalogCampaigns,
+	getCatalogCampaign,
+	removeCatalogCampaign,
+} from "../services/index.ts";
+import { cachedAsync, handleError, handleResponse } from "../utils/index.ts";
 
-const { Client } = require("@notionhq/client");
+export const getAllCampaignCatalogs = cachedAsync(
+	async (req: Request, res: Response) => {
+		const results = await getAllCatalogCampaigns();
 
-const notion = new Client({ auth: process.env.NOTION_TOKEN });
-
-const getAllCampaignCatalogs = async (req: Request, res: Response) => {
-	try {
-		const response = await notion.databases.query({
-			database_id: process.env.NOTION_CATALOG_CAMPAIGN_DB_ID,
-		});
-
-		res.json({
-			message: `Todas la relaciones de catálogo y campañas`,
-			data: response.results,
-		});
-	} catch (error) {
-		res.status(500).json({ error: error.message });
+		handleResponse(res, 200, results, "Catálogo Campañas recuperado con éxito");
 	}
-};
+);
 
-const getCampaignCatalogById = async (req: Request, res: Response) => {
-	try {
-		const id = req.params.id;
-		if (!id || !id.trim()) {
-			return res
-				.status(400)
-				.json({ error: `El ID de catálogo compaña es requerido` });
+export const getCampaignCatalogById = cachedAsync(
+	async (req: Request, res: Response) => {
+		const id = req.params.id as string;
+		const catalogCampaignId = id.trim();
+
+		if (!catalogCampaignId) {
+			handleError(
+				res,
+				400,
+				"El ID es requerido",
+				"El ID de Catálogo Campaña es requerido"
+			);
+			return;
 		}
-		const response = await notion.pages.retrieve({ page_id: id });
-		res.json({ message: `Catálogo compaña recuperada`, data: response });
-	} catch (error) {
-		res.status(500).json({ error: error.message });
+
+		const notionIdRegex =
+			/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
+
+		if (!notionIdRegex.test(catalogCampaignId)) {
+			handleError(res, 400, "ID inválido", "El formato del ID es inválido");
+			return;
+		}
+		const catalogCampaign = await getCatalogCampaign(catalogCampaignId);
+		handleResponse(
+			res,
+			200,
+			catalogCampaign,
+			"Catálogo Campaña recuperado con éxito"
+		);
 	}
-};
+);
 
-const createCampaignCatalog = async (req: Request, res: Response) => {
-	try {
-		// id, fecha creación, fecha de actualización, id campaña, id catalogo
-		const { id_campaign, id_catalog } = req.body;
+export const createCampaignCatalog = cachedAsync(
+	async (req: Request, res: Response) => {
+		const { campaign_id, catalog_id }: CatalogCampaignDto = req.body;
 
-		if (!id_campaign || !id_catalog) {
-			return res.status(400).json({
-				error: `El ID de la campaña y del catálogo son requeridos.`,
-			});
+		if (!campaign_id || !catalog_id) {
+			handleError(
+				res,
+				400,
+				"Algunos campos son requeridos",
+				"El ID de Campaña, el ID de Catálogo son requeridos"
+			);
+			return;
 		}
 
-		let currentCampaign;
-		try {
-			currentCampaign = await notion.pages.retrieve({ page_id: id_campaign });
-		} catch (error) {
-			res.status(404).json({ error: `Campaña no encontrada.` });
+		const notionIdRegex =
+			/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
+
+		if (!notionIdRegex.test(campaign_id)) {
+			handleError(
+				res,
+				400,
+				"ID inválido",
+				"El formato del ID de la Campaña es inválido"
+			);
+			return;
 		}
 
-		let currentCatalog;
-		try {
-			currentCatalog = await notion.pages.retrieve({ page_id: id_catalog });
-		} catch (error) {
-			res.status(404).json({ error: `Catálogo no encontrado.` });
+		if (!notionIdRegex.test(catalog_id)) {
+			handleError(
+				res,
+				400,
+				"ID inválido",
+				"El formato del ID del Catálogo es inválido"
+			);
+			return;
 		}
 
-		const now = new Date().toISOString();
-		const uuid = crypto.randomUUID();
-		const response = await notion.pages.create({
-			parent: { database_id: process.env.NOTION_CATALOG_CAMPAIGN_DB_ID },
-			properties: {
-				ID: { title: [{ text: { content: uuid } }] },
-				CAMPAIGN: { relation: [{ id: currentCampaign.id }] },
-				CATALOG: { relation: [{ id: currentCatalog.id }] },
-				CREATED_AT: { date: { start: now } },
-				UPDATED_AT: { date: { start: now } },
-			},
+		const response = await addCatalogCampaign({
+			campaign_id,
+			catalog_id,
 		});
 
-		res.json({ message: `Catálogo campaña`, data: response });
-	} catch (error) {
-		res.status(500).json({ error: error.message });
+		handleResponse(res, 201, response, "Catálogo Campaña creado con éxito");
 	}
-};
+);
 
-const updateCampaignCatalog = async (req: Request, res: Response) => {};
+export const updateCampaignCatalog = cachedAsync(
+	async (req: Request, res: Response) => {}
+);
 
-const deleteCampaignCatalog = async (req: Request, res: Response) => {
-	try {
-		const id = req.params.id.trim();
-		if (!id) {
-			return res.status(400).json({ error: `El ID es requerido.` });
+export const deleteCampaignCatalog = cachedAsync(
+	async (req: Request, res: Response) => {
+		const id = req.params.id as string;
+		const catalogCampaignId = id.trim();
+
+		if (!catalogCampaignId) {
+			handleError(
+				res,
+				400,
+				"El ID es requerido",
+				"El ID de Catálogo Campaña es requerido"
+			);
+			return;
 		}
-		const responseCurrent = await notion.pages.retrieve({ page_id: id });
+		const catalogCampaign = await removeCatalogCampaign(catalogCampaignId);
 
-		if (!responseCurrent) {
-			return res.status(404).json({ error: `Catalogo campana no encontrado.` });
-		}
-		const response = await notion.pages.update({
-			page_id: id,
-			archived: true,
-			in_trash: true,
-		});
-		res.json({
-			message: `Catalogo campana eliminado exitosamente.`,
-			data: response,
-		});
-	} catch (error) {
-		res.status(500).json({ error: error.message });
+		handleResponse(
+			res,
+			204,
+			catalogCampaign,
+			"Catálogo Campaña eliminado con éxito"
+		);
 	}
-};
-
-export {
-	getAllCampaignCatalogs,
-	getCampaignCatalogById,
-	createCampaignCatalog,
-	updateCampaignCatalog,
-	deleteCampaignCatalog,
-};
+);

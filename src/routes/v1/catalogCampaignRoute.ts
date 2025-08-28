@@ -4,7 +4,7 @@ import {
 	getAllCampaignCatalogs,
 	getCampaignCatalogById,
 	updateCampaignCatalog,
-} from "@controllers/index.ts";
+} from "../../controllers/index.ts";
 import { Router } from "express";
 
 const catalogCampaignRouter = Router();
