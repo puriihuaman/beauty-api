@@ -1,3 +1,3 @@
-import type { CatalogModel } from "src/domain/model/catalogModel.ts";
+import type { CatalogModel } from "../../model/index.ts";
 
 export interface CatalogResponseDto extends CatalogModel {}

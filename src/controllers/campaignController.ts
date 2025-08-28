@@ -1,160 +1,145 @@
 import type { Request, Response } from "express";
+import type { CampaignRequestDto } from "../domain/dto/index.ts";
+import {
+	addCampaign,
+	editCampaign,
+	getACampaign,
+	getAllCampaign,
+	removeCampaign,
+} from "../services/index.ts";
+import {
+	cachedAsync,
+	capitalizeFirstLetter,
+	ClientError,
+	formatCampaignName,
+	handleError,
+	handleResponse,
+} from "../utils/index.ts";
 
-const { Client } = require("@notionhq/client");
-const { formatCampaignName } = require("../utils/format-campaign-name");
+export const getAllCampaigns = cachedAsync(
+	async (req: Request, res: Response) => {
+		const result = await getAllCampaign();
 
-const notion = new Client({ auth: process.env.NOTION_TOKEN });
-
-const getAllCampaigns = async (req: Request, res: Response) => {
-	try {
-		const response = await notion.databases.query({
-			database_id: process.env.NOTION_CAMPAIGNS_DB_ID,
-		});
-		res.json({ message: `Todas las campañas`, data: response.results });
-	} catch (error) {
-		res.status(500).json({ error: error.message });
+		handleResponse(res, 200, result, "Campañas recuperadas");
 	}
-};
+);
 
-const getCampaignById = async (req: Request, res: Response) => {
-	try {
-		const id = req.params.id;
-		if (!id) {
-			return res
-				.status(400)
-				.json({ error: `El ID de la campaña es requerido.` });
+export const getCampaignById = cachedAsync(
+	async (req: Request, res: Response) => {
+		const id = req.params.id as string;
+		const campaignId = id.trim();
+
+		if (!campaignId) {
+			throw handleError(
+				res,
+				400,
+				"ID es requerido",
+				"El ID de la campaña es requerido"
+			);
 		}
-		const response = await notion.pages.retrieve({ page_id: id });
-		res.json({ message: `Campaña recuperada.`, data: response });
-	} catch (error) {
-		res.status(500).json({ error: error.message });
-	}
-};
+		const notionIdRegex =
+			/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 
-const createCampaign = async (req: Request, res: Response) => {
-	try {
-		const { name, startDate, endDate } = req.body;
+		if (!notionIdRegex.test(campaignId)) {
+			throw handleError(
+				res,
+				400,
+				"ID inválido",
+				"El formato del ID es inválido"
+			);
+		}
+
+		const campaign = await getACampaign(id);
+
+		handleResponse(res, 200, campaign, "Campaña recuperada");
+	}
+);
+
+export const createCampaign = cachedAsync(
+	async (req: Request, res: Response) => {
+		const { name, start_date, end_date }: CampaignRequestDto = req.body;
 		const cleanName = name.trim();
 
-		if (!cleanName || !startDate || !endDate) {
-			return res.status(400).json({
-				error: `El nombre, fecha de inicio y fecha de fin de la campaña son requeridos.`,
-			});
+		if (!cleanName || !start_date || !end_date) {
+			handleError(
+				res,
+				400,
+				"Algunos campos son requeridos",
+				"El nombre, fecha de inicio y fecha de fin de la campaña son requeridos"
+			);
 		}
 
-		const existing = await notion.databases.query({
-			database_id: process.env.NOTION_CAMPAIGNS_DB_ID,
-			filter: {
-				property: `NAME`,
-				title: { equals: formatCampaignName(cleanName) },
-			},
+		const campaign = await addCampaign({
+			name: capitalizeFirstLetter(cleanName),
+			start_date,
+			end_date,
 		});
 
-		if (existing.results.length > 0) {
-			return res.status(409).json({ error: `La campaña ya existe.` });
-		}
-		const now = new Date().toISOString();
-		const response = await notion.pages.create({
-			parent: { database_id: process.env.NOTION_CAMPAIGNS_DB_ID },
-			properties: {
-				NAME: { title: [{ text: { content: formatCampaignName(cleanName) } }] },
-				START_DATE: { date: { start: startDate } },
-				END_DATE: { date: { start: endDate } },
-				CREATED_AT: { date: { start: now } },
-				UPDATED_AT: { date: { start: now } },
-			},
-		});
-
-		res.json({ message: `Campaña creada.`, data: response });
-	} catch (error) {
-		res.status(500).json({ error: error.message });
+		handleResponse(res, 201, campaign, "Campaña creada con éxito");
 	}
-};
+);
 
-const updateCampaign = async (req: Request, res: Response) => {
-	try {
-		const { name, startDate, endDate } = req.body;
-		const id = req.params.id;
+export const updateCampaign = cachedAsync(
+	async (req: Request, res: Response) => {
+		const { name, start_date, end_date }: CampaignRequestDto = req.body;
+		const id = req.params.id as string;
+
+		const campaignId = id.trim();
 		const cleanName = name.trim();
 
-		if (!cleanName || !startDate || !endDate) {
-			return res.status(400).json({
-				error: `Nombre, fecha de inicio, fecha de fin son requeridos.`,
-			});
+		if (!campaignId || !cleanName || !start_date || !end_date) {
+			throw new ClientError(
+				"Algunos campos son requeridos",
+				400,
+				"ID, Nombre, fecha de inicio, fecha de fin son requeridos"
+			);
+		}
+
+		const notionIdRegex =
+			/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
+
+		if (!notionIdRegex.test(campaignId)) {
+			throw handleError(
+				res,
+				400,
+				"ID inválido",
+				"El formato del ID es inválido"
+			);
 		}
 
 		if (cleanName.length > 20) {
-			return res
-				.status(400)
-				.json({ error: `El nombre de la campaña es demasiado largo.` });
-		}
-		let currentCampaign = null;
-		try {
-			currentCampaign = await notion.pages.retrieve({ page_id: id });
-		} catch (error) {
-			return res.status(404).json({ erro: `No existe la campaña.` });
+			throw new ClientError(
+				"El Nombre de la campaña es demasiado largo",
+				400,
+				"El tamaño del nombre de la campaña no debería superar los 20 caracteres"
+			);
 		}
 
-		const existing = await notion.databases.query({
-			database_id: process.env.NOTION_CAMPAIGNS_DB_ID,
-			filter: {
-				property: `NAME`,
-				title: { equals: cleanName },
-			},
+		const campaign = await editCampaign({
+			id: campaignId,
+			name: formatCampaignName(cleanName),
+			start_date: start_date,
+			end_date: end_date,
 		});
 
-		if (existing.results.length > 0) {
-			return res
-				.status(409)
-				.json({ error: `Ya existe un catálogo con este nombre.` });
-		}
-		const now = new Date().toISOString();
-		const response = await notion.pages.update({
-			page_id: id,
-			properties: {
-				NAME: { title: [{ text: { content: formatCampaignName(cleanName) } }] },
-				START_DATE: { date: { start: startDate } },
-				END_DATE: { date: { start: endDate } },
-				UPDATED_AT: { date: { start: now } },
-			},
-		});
-
-		res.json({ message: `Campaña actualizada exitosamente.`, data: response });
-	} catch (error) {
-		res.status(500).json({ error: error.message });
+		handleResponse(res, 200, campaign, "Campaña actualizada exitosamente");
 	}
-};
+);
 
-const deleteCampaign = async (req: Request, res: Response) => {
-	try {
-		const id = req.params.id;
+export const deleteCampaign = cachedAsync(
+	async (req: Request, res: Response) => {
+		const id = req.params.id as string;
+		const campaignId = id.trim();
 
-		if (!id || !id.trim()) {
-			return res
-				.status(400)
-				.json({ error: `El ID de la campaña es requerido.` });
+		if (!campaignId) {
+			throw new ClientError(
+				"El ID es requerido",
+				400,
+				"El ID de la campaña es requerido"
+			);
 		}
-		const responseCurrent = await notion.pages.retrieve({ page_id: id });
 
-		if (!responseCurrent)
-			return res.status(404).json({ error: `No existe la campaña` });
-
-		const response = await notion.pages.update({
-			page_id: id,
-			archived: true,
-			in_trash: true,
-		});
-
-		res.json({ message: `Campaña eliminada exitosamente.`, data: response });
-	} catch (error) {
-		res.status(500).json({ error: error.message });
+		const campaign = await removeCampaign(campaignId);
+		handleResponse(res, 204, campaign, "Campaña eliminada exitosamente");
 	}
-};
-
-module.exports = {
-	getAllCampaigns,
-	getCampaignById,
-	createCampaign,
-	updateCampaign,
-	deleteCampaign,
-};
+);

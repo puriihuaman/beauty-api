@@ -14,8 +14,8 @@ export const handleResponse = <T>(
 	message: string
 ) => {
 	res.status(statusCode).json({
-		hasError: false,
-		statusCode,
+		has_error: false,
+		status_code: statusCode,
 		message,
 		data,
 	});

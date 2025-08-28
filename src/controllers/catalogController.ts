@@ -1,21 +1,23 @@
 import type { Request, Response } from "express";
-import type { CatalogRequestDto } from "../domain/dto/request/catalogRequestDto.ts";
+import type { CatalogRequestDto } from "../domain/dto/index.ts";
 import {
 	addCatalog,
 	editCatalog,
 	getACatalog,
-	getAll,
+	getAllCampaign,
 	removeCatalog,
-} from "../services/catalogService.ts";
-import { cachedAsync } from "../utils/cachedAsync.ts";
-import { ClientError } from "../utils/exception.ts";
-import { handleError } from "../utils/handleError.ts";
-import { handleResponse } from "../utils/handleResponse.ts";
-import { capitalizeFirstLetter } from "../utils/index.ts";
+} from "../services/index.ts";
+import {
+	cachedAsync,
+	capitalizeFirstLetter,
+	ClientError,
+	handleError,
+	handleResponse,
+} from "../utils/index.ts";
 
 export const getAllCatalogs = cachedAsync(
 	async (req: Request, res: Response) => {
-		const results = await getAll();
+		const results = await getAllCampaign();
 
 		handleResponse(res, 200, results, "Catálogos recuperados");
 	}
@@ -70,7 +72,7 @@ export const createCatalog = cachedAsync(
 		const catalog = await addCatalog({
 			name: capitalizeFirstLetter(cleanName),
 		});
-		handleResponse(res, 200, catalog, "Catálogo creado con éxito");
+		handleResponse(res, 201, catalog, "Catálogo creado con éxito");
 	}
 );
 

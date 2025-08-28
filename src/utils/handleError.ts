@@ -7,8 +7,8 @@ export const handleError = (
 	details: string
 ) => {
 	res.status(statusCode).json({
-		hasError: true,
-		statusCode,
+		has_error: true,
+		status_code: statusCode,
 		message,
 		details,
 	});
