@@ -1,8 +1,10 @@
+import type { Request, Response } from "express";
+
 const { Client } = require("@notionhq/client");
 
 const notion = new Client({ auth: process.env.NOTION_TOKEN });
 
-const getAllCampaignCatalogs = async (req, res) => {
+const getAllCampaignCatalogs = async (req: Request, res: Response) => {
 	try {
 		const response = await notion.databases.query({
 			database_id: process.env.NOTION_CATALOG_CAMPAIGN_DB_ID,
@@ -17,7 +19,7 @@ const getAllCampaignCatalogs = async (req, res) => {
 	}
 };
 
-const getCampaignCatalogById = async (req, res) => {
+const getCampaignCatalogById = async (req: Request, res: Response) => {
 	try {
 		const id = req.params.id;
 		if (!id || !id.trim()) {
@@ -32,7 +34,7 @@ const getCampaignCatalogById = async (req, res) => {
 	}
 };
 
-const createCampaignCatalog = async (req, res) => {
+const createCampaignCatalog = async (req: Request, res: Response) => {
 	try {
 		// id, fecha creación, fecha de actualización, id campaña, id catalogo
 		const { id_campaign, id_catalog } = req.body;
@@ -76,9 +78,9 @@ const createCampaignCatalog = async (req, res) => {
 	}
 };
 
-const updateCampaignCatalog = async (req, res) => {};
+const updateCampaignCatalog = async (req: Request, res: Response) => {};
 
-const deleteCampaignCatalog = async (req, res) => {
+const deleteCampaignCatalog = async (req: Request, res: Response) => {
 	try {
 		const id = req.params.id.trim();
 		if (!id) {
@@ -103,7 +105,7 @@ const deleteCampaignCatalog = async (req, res) => {
 	}
 };
 
-module.exports = {
+export {
 	getAllCampaignCatalogs,
 	getCampaignCatalogById,
 	createCampaignCatalog,

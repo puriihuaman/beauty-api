@@ -1,13 +1,13 @@
-const express = require("express");
-const {
+import {
+	createProduct,
+	deleteProduct,
 	getAllProducts,
 	getProductById,
-	createProduct,
 	updateProduct,
-	deleteProduct,
-} = require("../../controllers");
+} from "@controllers/index.ts";
+import { Router } from "express";
 
-const productRouter = express.Router();
+const productRouter = Router();
 
 productRouter.get(`/`, getAllProducts);
 
@@ -19,4 +19,4 @@ productRouter.put(`/update/:id`, updateProduct);
 
 productRouter.delete(`/delete/:id`, deleteProduct);
 
-module.exports = productRouter;
+export { productRouter };

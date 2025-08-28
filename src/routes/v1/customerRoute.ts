@@ -1,13 +1,13 @@
-const express = require("express");
-const {
+import {
+	createCustomer,
+	deleteCustomer,
 	getAllCustomer,
 	getCustomerById,
-	createCustomer,
 	updateCustomer,
-	deleteCustomer,
-} = require("../../controllers");
+} from "@controllers/index.ts";
+import { Router } from "express";
 
-const customerRouter = express.Router();
+const customerRouter = Router();
 
 customerRouter.route(`/`).get(getAllCustomer);
 customerRouter.route(`/:id`).get(getCustomerById);
@@ -15,4 +15,4 @@ customerRouter.route(`/create`).post(createCustomer);
 customerRouter.route(`/update/:id`).put(updateCustomer);
 customerRouter.route(`/delete/:id`).delete(deleteCustomer);
 
-module.exports = customerRouter;
+export { customerRouter };
