@@ -9,6 +9,11 @@ import {
 import type { CampaignRequestDto } from "../domain/dto/index.ts";
 import type { CampaignModel } from "../domain/model/index.ts";
 import { ClientError } from "../utils/index.ts";
+import { getACatalog } from "./catalogService.ts";
+import {
+	addCatalogCampaign,
+	editCatalogCampaign,
+} from "./catalogCampaignService.ts";
 
 const notion = new Client({ auth: process.env.NOTION_TOKEN as string });
 
@@ -49,6 +54,9 @@ export const addCampaign = async (campaign: CampaignRequestDto) => {
 			"No puede haber campañas duplicadas"
 		);
 	}
+
+	const catalog = await getACatalog(campaign.catalog_id);
+
 	const currentTime = new Date().toISOString();
 
 	const response = await notion.pages.create({
@@ -64,6 +72,11 @@ export const addCampaign = async (campaign: CampaignRequestDto) => {
 			[CAMPAIGN_PROPERTIES.CREATED_AT]: { date: { start: currentTime } },
 			[CAMPAIGN_PROPERTIES.UPDATED_AT]: { date: { start: currentTime } },
 		},
+	});
+
+	await addCatalogCampaign({
+		campaign_id: response.id,
+		catalog_id: catalog.id,
 	});
 
 	return mapperToObject(response);
@@ -90,13 +103,16 @@ export const editCampaign = async (campaign: CampaignRequestDto) => {
 		},
 	});
 
-	if (existing.results.length > 0) {
+	if (existing.results.length > 1) {
 		throw new ClientError(
 			"Ya existe una campaña con este nombre",
 			409,
 			"No puede haber campañas duplicadas"
 		);
 	}
+
+	const catalog = await getACatalog(campaign.catalog_id);
+
 	const currentTime = new Date().toISOString();
 	const response = await notion.pages.update({
 		page_id: campaign.id as string,
@@ -110,6 +126,12 @@ export const editCampaign = async (campaign: CampaignRequestDto) => {
 			[CAMPAIGN_PROPERTIES.END_DATE]: { date: { start: campaign.end_date } },
 			[CAMPAIGN_PROPERTIES.UPDATED_AT]: { date: { start: currentTime } },
 		},
+	});
+
+	await editCatalogCampaign({
+		id: campaign.catalog_campaign_id as string,
+		campaign_id: response.id,
+		catalog_id: catalog.id,
 	});
 
 	return mapperToObject(response);

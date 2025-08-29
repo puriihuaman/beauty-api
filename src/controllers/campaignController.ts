@@ -57,7 +57,8 @@ export const getCampaignById = cachedAsync(
 
 export const createCampaign = cachedAsync(
 	async (req: Request, res: Response) => {
-		const { name, start_date, end_date }: CampaignRequestDto = req.body;
+		const { name, catalog_id, start_date, end_date }: CampaignRequestDto =
+			req.body;
 		const cleanName = name.trim();
 
 		if (!cleanName || !start_date || !end_date) {
@@ -69,8 +70,21 @@ export const createCampaign = cachedAsync(
 			);
 		}
 
+		const notionIdRegex =
+			/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
+
+		if (!notionIdRegex.test(catalog_id)) {
+			throw handleError(
+				res,
+				400,
+				"ID inválido",
+				"El formato del ID del Catálogo es inválido"
+			);
+		}
+
 		const campaign = await addCampaign({
 			name: capitalizeFirstLetter(cleanName),
+			catalog_id,
 			start_date,
 			end_date,
 		});
@@ -81,17 +95,30 @@ export const createCampaign = cachedAsync(
 
 export const updateCampaign = cachedAsync(
 	async (req: Request, res: Response) => {
-		const { name, start_date, end_date }: CampaignRequestDto = req.body;
+		const {
+			name,
+			catalog_id,
+			start_date,
+			end_date,
+			catalog_campaign_id,
+		}: CampaignRequestDto = req.body;
 		const id = req.params.id as string;
 
 		const campaignId = id.trim();
 		const cleanName = name.trim();
 
-		if (!campaignId || !cleanName || !start_date || !end_date) {
+		if (
+			!campaignId ||
+			!catalog_id ||
+			!cleanName ||
+			!start_date ||
+			!end_date ||
+			!catalog_campaign_id
+		) {
 			throw new ClientError(
 				"Algunos campos son requeridos",
 				400,
-				"ID, Nombre, fecha de inicio, fecha de fin son requeridos"
+				"ID, Nombre, ID de catálogo, fecha de inicio, fecha de fin son requeridos"
 			);
 		}
 
@@ -107,6 +134,15 @@ export const updateCampaign = cachedAsync(
 			);
 		}
 
+		if (!notionIdRegex.test(catalog_id)) {
+			throw handleError(
+				res,
+				400,
+				"ID inválido",
+				"El formato del ID del Catálogo es inválido"
+			);
+		}
+
 		if (cleanName.length > 20) {
 			throw new ClientError(
 				"El Nombre de la campaña es demasiado largo",
@@ -118,8 +154,10 @@ export const updateCampaign = cachedAsync(
 		const campaign = await editCampaign({
 			id: campaignId,
 			name: formatCampaignName(cleanName),
+			catalog_id,
 			start_date: start_date,
 			end_date: end_date,
+			catalog_campaign_id,
 		});
 
 		handleResponse(res, 200, campaign, "Campaña actualizada exitosamente");

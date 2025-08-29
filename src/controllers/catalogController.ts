@@ -4,7 +4,7 @@ import {
 	addCatalog,
 	editCatalog,
 	getACatalog,
-	getAllCampaign,
+	getCatalogs,
 	removeCatalog,
 } from "../services/index.ts";
 import {
@@ -17,7 +17,7 @@ import {
 
 export const getAllCatalogs = cachedAsync(
 	async (req: Request, res: Response) => {
-		const results = await getAllCampaign();
+		const results = await getCatalogs();
 
 		handleResponse(res, 200, results, "Catálogos recuperados");
 	}
