@@ -37,29 +37,29 @@ export const getCatalogCampaign = async (catalogCampaignId: string) => {
 export const addCatalogCampaign = async (
 	catalogCampaign: CatalogCampaignDto
 ) => {
-	let currentCampaign = await notion.pages.retrieve({
-		page_id: catalogCampaign.campaign_id,
-	});
+	// let currentCampaign = await notion.pages.retrieve({
+	// 	page_id: catalogCampaign.campaign_id,
+	// });
 
-	if (!currentCampaign?.id) {
-		throw new ClientError(
-			"Campaña no encontrada",
-			404,
-			`No existe la campaña con el ID: ${catalogCampaign.campaign_id}`
-		);
-	}
+	// if (!currentCampaign?.id) {
+	// 	throw new ClientError(
+	// 		"Campaña no encontrada",
+	// 		404,
+	// 		`No existe la campaña con el ID: ${catalogCampaign.campaign_id}`
+	// 	);
+	// }
 
-	let currentCatalog = await notion.pages.retrieve({
-		page_id: catalogCampaign.catalog_id,
-	});
+	// let currentCatalog = await notion.pages.retrieve({
+	// 	page_id: catalogCampaign.catalog_id,
+	// });
 
-	if (!currentCatalog?.id) {
-		throw new ClientError(
-			"Catálogo no encontrada",
-			404,
-			`No existe el catálogo con el ID: ${catalogCampaign.catalog_id}`
-		);
-	}
+	// if (!currentCatalog?.id) {
+	// 	throw new ClientError(
+	// 		"Catálogo no encontrada",
+	// 		404,
+	// 		`No existe el catálogo con el ID: ${catalogCampaign.catalog_id}`
+	// 	);
+	// }
 
 	const currentTime = new Date().toISOString();
 	const uuid = crypto.randomUUID();
@@ -72,10 +72,10 @@ export const addCatalogCampaign = async (
 				title: [{ text: { content: uuid } }],
 			},
 			[CATALOG_CAMPAIGN_PROPERTIES.CAMPAIGN]: {
-				relation: [{ id: currentCampaign.id }],
+				relation: [{ id: catalogCampaign.campaign_id }],
 			},
 			[CATALOG_CAMPAIGN_PROPERTIES.CATALOG]: {
-				relation: [{ id: currentCatalog.id }],
+				relation: [{ id: catalogCampaign.catalog_id }],
 			},
 			[CATALOG_CAMPAIGN_PROPERTIES.CREATED_AT]: {
 				date: { start: currentTime },
@@ -92,7 +92,36 @@ export const addCatalogCampaign = async (
 export const editCatalogCampaign = async (
 	catalogCampaign: CatalogCampaignDto
 ) => {
-	console.log(catalogCampaign);
+	const currentCatalogCampaign = await notion.pages.retrieve({
+		page_id: catalogCampaign.id as string,
+	});
+
+	if (!currentCatalogCampaign.id) {
+		throw new ClientError(
+			"Catálogo Campaña no encontrada",
+			404,
+			`No existe Catálogo Campaña con el ID: ${catalogCampaign.id}`
+		);
+	}
+
+	const currentTime = new Date().toISOString();
+
+	const response = await notion.pages.update({
+		page_id: catalogCampaign.id as string,
+		properties: {
+			[CATALOG_CAMPAIGN_PROPERTIES.CAMPAIGN]: {
+				relation: [{ id: catalogCampaign.campaign_id }],
+			},
+			[CATALOG_CAMPAIGN_PROPERTIES.CATALOG]: {
+				relation: [{ id: catalogCampaign.catalog_id }],
+			},
+			[CATALOG_CAMPAIGN_PROPERTIES.UPDATED_AT]: {
+				date: { start: currentTime },
+			},
+		},
+	});
+
+	return mapperToCatalogCampaign(response);
 };
 
 export const removeCatalogCampaign = async (catalogCampaignId: string) => {

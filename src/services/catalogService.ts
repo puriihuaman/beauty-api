@@ -26,7 +26,7 @@ export const getACatalog = async (catalogId: string) => {
 	return mapperToObject(response);
 };
 
-export const getAll = async () => {
+export const getCatalogs = async () => {
 	const { results } = await notion.databases.query({
 		database_id: process.env.NOTION_CATALOGS_DB_ID as string,
 	});
@@ -87,7 +87,7 @@ export const editCatalog = async (catalog: CatalogRequestDto) => {
 		},
 	});
 
-	if (existing.results.length > 0) {
+	if (existing.results.length > 1) {
 		throw new ClientError(
 			"Ya existe un catálogo con este nombre",
 			409,
