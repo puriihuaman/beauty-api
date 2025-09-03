@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import type { CampaignRequestDto } from "../domain/dto/index.ts";
+import type { CampaignRequestDto } from "../dto/index.ts";
 import {
 	addCampaign,
 	editCampaign,

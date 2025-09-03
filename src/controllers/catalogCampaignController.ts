@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import type { CatalogCampaignDto } from "../domain/dto/index.ts";
+import type { CatalogCampaignDto } from "../dto/index.ts";
 import {
 	addCatalogCampaign,
 	getAllCatalogCampaigns,

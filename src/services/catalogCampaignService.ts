@@ -6,8 +6,8 @@ import {
 	type PartialDatabaseObjectResponse,
 	type PartialPageObjectResponse,
 } from "@notionhq/client";
-import type { CatalogCampaignDto } from "../domain/dto/index.ts";
-import type { CatalogCampaignModel } from "../domain/model/index.ts";
+import type { CatalogCampaignDto } from "../dto/index.ts";
+import type { CatalogCampaignModel } from "../model/index.ts";
 import { ClientError, ServerError } from "../utils/index.ts";
 
 const notion = new Client({ auth: process.env.NOTION_TOKEN as string });

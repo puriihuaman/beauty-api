@@ -6,8 +6,8 @@ import {
 	type PartialDatabaseObjectResponse,
 	type PartialPageObjectResponse,
 } from "@notionhq/client";
-import type { CampaignRequestDto } from "../domain/dto/index.ts";
-import type { CampaignModel } from "../domain/model/index.ts";
+import type { CampaignRequestDto } from "../dto/index.ts";
+import type { CampaignModel } from "../model/index.ts";
 import { ClientError } from "../utils/index.ts";
 import { getACatalog } from "./catalogService.ts";
 import {

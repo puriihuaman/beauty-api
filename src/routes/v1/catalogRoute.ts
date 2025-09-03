@@ -1,22 +1,26 @@
 import { Router } from "express";
-import {
-	createCatalog,
-	deleteCatalog,
-	getAllCatalogs,
-	getCatalogById,
-	updateCatalog,
-} from "../../controllers/index.ts";
+import type { ICatalogController } from "../../controllers/index.ts";
 
-const catalogRouter = Router();
+export function catalogRouter(catalogController: ICatalogController): Router {
+	const {
+		getAllCatalogs,
+		getCatalogById,
+		createCatalog,
+		updateCatalog,
+		deleteCatalog,
+	} = catalogController;
 
-catalogRouter.route("/").get(getAllCatalogs);
+	const catalogRouter = Router();
 
-catalogRouter.get("/:id", getCatalogById);
+	catalogRouter.get("/", getAllCatalogs);
 
-catalogRouter.post("/create", createCatalog);
+	catalogRouter.get("/:id", getCatalogById);
 
-catalogRouter.put("/update/:id", updateCatalog);
+	catalogRouter.post("/create", createCatalog);
 
-catalogRouter.delete("/delete/:id", deleteCatalog);
+	catalogRouter.put("/update/:id", updateCatalog);
 
-export { catalogRouter };
+	catalogRouter.delete("/delete/:id", deleteCatalog);
+
+	return catalogRouter;
+}

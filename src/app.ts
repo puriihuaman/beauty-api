@@ -1,42 +1,45 @@
-import "./config/index.ts";
-
-import type { NextFunction, Request, Response } from "express";
+import { Client } from "@notionhq/client";
+import type { Application, NextFunction, Request, Response } from "express";
 import express, { json } from "express";
+import { env } from "./config/environment.ts";
+import { catalogController } from "./controllers/index.ts";
 import { corsMiddleware } from "./middleware/index.ts";
-import {
-	campaignRouter,
-	catalogCampaignRouter,
-	catalogRouter,
-} from "./routes/v1/index.ts";
+import { notionCatalogoRepository } from "./repository/notion/notionCatalogoRepository.ts";
+import { catalogRouter } from "./routes/v1/index.ts";
+import { catalogService } from "./services/index.ts";
 import { ClientError, handleError, ServerError } from "./utils/index.ts";
 
-const app = express();
+export const createApp = (): Application => {
+	const app = express();
 
-const PORT = Number(process.env.PORT) || 3000;
-const HOSTNAME = process.env.HOSTNAME || "0.0.0.0";
+	app.disable("x-powered-by");
+	app.use(corsMiddleware);
+	app.use(json());
+	app.use(express.urlencoded({ extended: true }));
 
-app.disable("x-powered-by");
-app.use(corsMiddleware);
-app.use(json());
+	const notionClient = new Client({ auth: env.NOTION_TOKEN });
 
-const CONTEXT_PATH = `/api/v1/webhook`;
+	const repository = notionCatalogoRepository(notionClient, env.NOTION_CATALOG);
 
-app.use(`${CONTEXT_PATH}/catalogs`, catalogRouter);
-app.use(`${CONTEXT_PATH}/campaigns`, campaignRouter);
-app.use(`${CONTEXT_PATH}/catalog-campaign`, catalogCampaignRouter);
-// app.use(`${CONTEXT_PATH}/customers`, customerRouter);
-// app.use(`${CONTEXT_PATH}/products`, productRouter);
-// app.use(`${CONTEXT_PATH}/orders`, orderRouter);
+	const service = catalogService(repository);
+	const controller = catalogController(service);
 
-app.use(
-	(
-		error: ClientError | ServerError,
-		req: Request,
-		res: Response,
-		next: NextFunction
-	) => {
-		handleError(res, error.statusCode, error.message, error.details);
-	}
-);
+	const CONTEXT_PATH = `/api/v1/webhook`;
 
-app.listen(PORT, () => console.log(`Escuchando en ${HOSTNAME}:${PORT}`));
+	const catalogRoutes = catalogRouter(controller);
+
+	app.use(`${CONTEXT_PATH}/catalogs`, catalogRoutes);
+
+	app.use(
+		(
+			error: ClientError | ServerError,
+			req: Request,
+			res: Response,
+			next: NextFunction
+		) => {
+			handleError(res, error.statusCode, error.message, error.details);
+		}
+	);
+
+	return app;
+};

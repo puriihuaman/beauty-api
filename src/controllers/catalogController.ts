@@ -1,129 +1,177 @@
-import type { Request, Response } from "express";
-import type { CatalogRequestDto } from "../domain/dto/index.ts";
-import {
-	addCatalog,
-	editCatalog,
-	getACatalog,
-	getCatalogs,
-	removeCatalog,
-} from "../services/index.ts";
-import {
-	cachedAsync,
-	capitalizeFirstLetter,
-	ClientError,
-	handleError,
-	handleResponse,
-} from "../utils/index.ts";
+import type { NextFunction, Request, Response } from "express";
+import { catalogRequestValidator } from "../dto/index.ts";
+import type { ICatalogService } from "../services/index.ts";
+import { handleResponse } from "../utils/index.ts";
 
-export const getAllCatalogs = cachedAsync(
-	async (req: Request, res: Response) => {
-		const results = await getCatalogs();
+export const catalogController = (
+	service: ICatalogService
+): ICatalogController => {
+	return {
+		createCatalog: async (
+			req: Request,
+			res: Response,
+			next: NextFunction
+		): Promise<void> => {
+			try {
+				const request = catalogRequestValidator(req.body);
+				const catalog = await service.createCatalog(request);
 
-		handleResponse(res, 200, results, "Catálogos recuperados");
-	}
-);
+				res.status(201).json({
+					success: true,
+					data: catalog,
+					message: "Catálogo creado exitosamente",
+				});
+			} catch (error) {
+				next(error);
+			}
+		},
 
-export const getCatalogById = cachedAsync(
-	async (req: Request, res: Response) => {
-		const id = req.params.id as string;
-		const catalogId = id.trim();
+		getAllCatalogs: async (
+			req: Request,
+			res: Response,
+			next: NextFunction
+		): Promise<void> => {
+			try {
+				const includeArchived = req.query.includeArchived === "true";
+				const catalogs = await service.getAllCatalogs(includeArchived);
 
-		if (!catalogId) {
-			throw handleError(
-				res,
-				400,
-				"ID es requerido",
-				"El ID del catálogo es requerido"
-			);
-		}
+				handleResponse(res, 200, catalogs, "Catálogos recuperados");
+			} catch (error) {
+				next(error);
+			}
+		},
 
-		const notionIdRegex =
-			/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
+		getCatalogById: async (
+			req: Request,
+			res: Response,
+			next: NextFunction
+		): Promise<void> => {
+			try {
+				const { id } = req.params;
+				const catalog = await service.getCatalogById(id as string);
 
-		if (!notionIdRegex.test(catalogId)) {
-			throw handleError(
-				res,
-				400,
-				"ID inválido",
-				"El formato del ID es inválido"
-			);
-		}
+				handleResponse(res, 200, catalog, "Catálogo recuperado");
+			} catch (error) {
+				next(error);
+			}
+		},
 
-		const response = await getACatalog(catalogId);
+		updateCatalog: async (
+			req: Request,
+			res: Response,
+			next: NextFunction
+		): Promise<void> => {
+			try {
+				const { id } = req.params;
+				const request = catalogRequestValidator(req.body);
+				const catalog = await service.updateCatalog(id as string, request);
 
-		handleResponse(res, 200, response, "Catálogo recuperado");
-	}
-);
+				handleResponse(res, 200, catalog, "Catálogo actualizado con éxito");
+			} catch (error) {
+				next(error);
+			}
+		},
 
-export const createCatalog = cachedAsync(
-	async (req: Request, res: Response) => {
-		const { name }: CatalogRequestDto = req.body;
-		const cleanName = name.trim();
+		archiveCatalog: async (
+			req: Request,
+			res: Response,
+			next: NextFunction
+		): Promise<void> => {
+			try {
+				const { id } = req.params;
+				const catalog = await service.archiveCatalog(id as string);
 
-		if (!cleanName) {
-			handleError(
-				res,
-				400,
-				"Nombre es requerido",
-				"El nombre del catálogo es requerido"
-			);
-		}
+				handleResponse(res, 200, catalog, "Catálogo archivado con éxito");
+			} catch (error) {
+				next(error);
+			}
+		},
 
-		const catalog = await addCatalog({
-			name: capitalizeFirstLetter(cleanName),
-		});
-		handleResponse(res, 201, catalog, "Catálogo creado con éxito");
-	}
-);
+		restoreCatalog: async (
+			req: Request,
+			res: Response,
+			next: NextFunction
+		): Promise<void> => {
+			try {
+				const { id } = req.params;
+				await service.restoreCatalog(id as string);
 
-export const updateCatalog = async (req: Request, res: Response) => {
-	const id = req.params.id as string;
-	const { name }: CatalogRequestDto = req.body;
+				handleResponse(res, 200, null, "Catálogo restaurado con éxito");
+			} catch (error) {
+				next(error);
+			}
+		},
 
-	const cleanName = name.trim();
-	const catalogId = id.trim();
+		deleteCatalog: async (
+			req: Request,
+			res: Response,
+			next: NextFunction
+		): Promise<void> => {
+			try {
+				const { id } = req.params;
+				await service.deleteCatalog(id as string);
 
-	if (!cleanName || !catalogId) {
-		throw new ClientError("ID y Nombre del catálogo son requeridos", 400, "");
-	}
+				handleResponse(res, 200, null, "Catálogo eliminado con éxito");
+			} catch (error) {
+				next(error);
+			}
+		},
 
-	const notionIdRegex =
-		/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
+		getCatalogStats: async (
+			req: Request,
+			res: Response,
+			next: NextFunction
+		): Promise<void> => {
+			try {
+				const stats = await service.getCatalogStats();
 
-	if (!notionIdRegex.test(catalogId)) {
-		throw handleError(res, 400, "ID inválido", "El formato del ID es inválido");
-	}
-
-	if (cleanName.length > 50) {
-		throw new ClientError(
-			"El Nombre del catálogo es demasiado largo",
-			400,
-			"El tamaño del nombre del catálogo no debería superar los 50 caracteres"
-		);
-	}
-
-	const catalog = await editCatalog({
-		id: catalogId,
-		name: capitalizeFirstLetter(cleanName),
-	});
-	handleResponse(res, 200, catalog, "Catálogo actualizado con éxito");
+				handleResponse(res, 200, stats, "Catálogo archivado con éxito");
+			} catch (error) {
+				next(error);
+			}
+		},
+	};
 };
 
-export const deleteCatalog = cachedAsync(
-	async (req: Request, res: Response) => {
-		// try {
-		const id = req.params.id as string;
-		const catalogId = id.trim();
-
-		if (!catalogId) {
-			throw new ClientError(
-				"El ID es requerido",
-				400,
-				"El ID del catálogo es requerido"
-			);
-		}
-
-		const catalog = await removeCatalog(catalogId);
-		handleResponse(res, 204, catalog, "Catálogo eliminado con éxito.");
-	}
-);
+export interface ICatalogController {
+	createCatalog: (
+		req: Request,
+		res: Response,
+		next: NextFunction
+	) => Promise<void>;
+	getAllCatalogs: (
+		req: Request,
+		res: Response,
+		next: NextFunction
+	) => Promise<void>;
+	getCatalogById: (
+		req: Request,
+		res: Response,
+		next: NextFunction
+	) => Promise<void>;
+	updateCatalog: (
+		req: Request,
+		res: Response,
+		next: NextFunction
+	) => Promise<void>;
+	archiveCatalog: (
+		req: Request,
+		res: Response,
+		next: NextFunction
+	) => Promise<void>;
+	restoreCatalog: (
+		req: Request,
+		res: Response,
+		next: NextFunction
+	) => Promise<void>;
+	deleteCatalog: (
+		req: Request,
+		res: Response,
+		next: NextFunction
+	) => Promise<void>;
+	getCatalogStats: (
+		req: Request,
+		res: Response,
+		next: NextFunction
+	) => Promise<void>;
+}

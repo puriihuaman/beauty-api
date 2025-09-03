@@ -1,187 +1,175 @@
+import type { ICatalogModel } from "../domain/model/index.ts";
 import {
-	Client,
-	type DatabaseObjectResponse,
-	type GetPageResponse,
-	type PageObjectResponse,
-	type PartialDatabaseObjectResponse,
-	type PartialPageObjectResponse,
-} from "@notionhq/client";
-import type { CatalogRequestDto } from "../domain/dto/index.ts";
-import type { CatalogModel } from "../domain/model/index.ts";
-import { ClientError } from "../utils/index.ts";
+	catalogRequestValidator,
+	type ICatalogRequest,
+	type ICatalogResponse,
+} from "../dto/index.ts";
+import type { ICatalogRepository } from "../repository/interface/catalogRepository.ts";
 
-const notion = new Client({ auth: process.env.NOTION_TOKEN as string });
-
-const CATALOG_PROPERTIES = {
-	NAME: "NAME",
-	CREATED_AT: "CREATED_AT",
-	UPDATED_AT: "UPDATED_AT",
-};
-
-export const getACatalog = async (catalogId: string) => {
-	const response: GetPageResponse = await notion.pages.retrieve({
-		page_id: catalogId,
-	});
-
-	return mapperToObject(response);
-};
-
-export const getCatalogs = async () => {
-	const { results } = await notion.databases.query({
-		database_id: process.env.NOTION_CATALOGS_DB_ID as string,
-	});
-
-	return mapperToList(results);
-};
-
-export const addCatalog = async (catalog: CatalogRequestDto) => {
-	const existing = await notion.databases.query({
-		database_id: process.env.NOTION_CATALOGS_DB_ID as string,
-		filter: {
-			property: CATALOG_PROPERTIES.NAME,
-			title: { equals: catalog.name },
-		},
-	});
-
-	if (existing.results.length > 0) {
-		throw new ClientError(
-			"Ya existe un catálogo",
-			409,
-			"No puede haber catálogos duplicados"
-		);
-	}
-
-	const currentTime = new Date().toISOString();
-
-	const response = await notion.pages.create({
-		parent: { database_id: process.env.NOTION_CATALOGS_DB_ID as string },
-		properties: {
-			[CATALOG_PROPERTIES.NAME]: {
-				title: [{ text: { content: catalog.name } }],
-			},
-			[CATALOG_PROPERTIES.CREATED_AT]: { date: { start: currentTime } },
-			[CATALOG_PROPERTIES.UPDATED_AT]: { date: { start: currentTime } },
-		},
-	});
-	return mapperToObject(response);
-};
-
-export const editCatalog = async (catalog: CatalogRequestDto) => {
-	const currentCatalog = await notion.pages.retrieve({
-		page_id: catalog.id as string,
-	});
-
-	if (!currentCatalog.id) {
-		throw new ClientError(
-			"Catálogo no encontrado",
-			404,
-			`No existe el catálogo con el ID: ${catalog.id}`
-		);
-	}
-
-	const existing = await notion.databases.query({
-		database_id: process.env.NOTION_CATALOGS_DB_ID as string,
-		filter: {
-			property: CATALOG_PROPERTIES.NAME,
-			title: { equals: catalog.name },
-		},
-	});
-
-	if (existing.results.length > 1) {
-		throw new ClientError(
-			"Ya existe un catálogo con este nombre",
-			409,
-			"No puede haber catálogos duplicados"
-		);
-	}
-
-	const currentTime = new Date().toISOString();
-
-	const response = await notion.pages.update({
-		page_id: catalog.id as string,
-		properties: {
-			[CATALOG_PROPERTIES.NAME]: {
-				title: [
-					{
-						text: { content: catalog.name },
-					},
-				],
-			},
-			[CATALOG_PROPERTIES.UPDATED_AT]: { date: { start: currentTime } },
-		},
-	});
-
-	return mapperToObject(response);
-};
-
-export const removeCatalog = async (catalogId: string) => {
-	const responseCurrent: GetPageResponse = await notion.pages.retrieve({
-		page_id: catalogId,
-	});
-
-	if (!responseCurrent) {
-		throw new ClientError(
-			"Catálogo no encontrado",
-			404,
-			`No existe el catálogo con el ID: ${catalogId}`
-		);
-	}
-
-	const response = await notion.pages.update({
-		page_id: catalogId,
-		archived: true,
-		in_trash: true,
-	});
-
-	return mapperToObject(response);
-};
-
-const mapperToObject = (result: GetPageResponse): CatalogModel => {
-	if (!("properties" in result)) {
-		throw new Error("El objeto no contiene properties");
-	}
-
-	const properties = result.properties;
-	const archived = result.archived;
-
-	if (!properties.NAME || !("title" in properties.NAME)) {
-		throw new Error(
-			"El objeto properties.NAME es undefined o no contiene title"
-		);
-	}
-
-	if (
-		!properties.CREATED_AT ||
-		!("created_time" in properties.CREATED_AT) ||
-		!properties.UPDATED_AT ||
-		!("last_edited_time" in properties.UPDATED_AT)
-	) {
-		throw new Error(
-			"El objeto properties.CREATED_AT es undefined o no contiene la fecha"
-		);
-	}
-
-	const { NAME, CREATED_AT, UPDATED_AT } = properties;
-
-	const textContent =
-		NAME.title.length >= 0 ? NAME.title[0]?.plain_text ?? "" : "";
-
+export const catalogService = (
+	repository: ICatalogRepository
+): ICatalogService => {
 	return {
-		id: result.id,
-		name: textContent,
-		created_at: CREATED_AT.created_time,
-		updated_at: UPDATED_AT.last_edited_time,
-		archived,
+		createCatalog: async (
+			request: ICatalogRequest
+		): Promise<ICatalogResponse> => {
+			const existingCatalog = await repository.findByName(request.name);
+			if (existingCatalog && !existingCatalog.archived) {
+				throw new Error("Ya existe un catálogo con ese nombre");
+			}
+
+			const currentTime = new Date().toISOString();
+			const catalog: ICatalogModel = {
+				name: catalogRequestValidator(request.name).name,
+				created_at: currentTime,
+				updated_at: currentTime,
+				archived: false,
+			};
+
+			const id = await repository.save(catalog);
+			catalog.id = id;
+
+			return mapToResponse(catalog);
+		},
+
+		getAllCatalogs: async (
+			includeArchived: boolean = false
+		): Promise<ICatalogResponse[]> => {
+			const catalogs = await repository.findAll(includeArchived);
+
+			return catalogs.map((catalog) => mapToResponse(catalog));
+		},
+
+		getCatalogById: async (id: string): Promise<ICatalogResponse> => {
+			const catalog = await repository.findById(id);
+			if (!catalog) {
+				throw new Error("Catálogo no encontrado");
+			}
+			return mapToResponse(catalog);
+		},
+
+		updateCatalog: async (
+			id: string,
+			request: ICatalogRequest
+		): Promise<ICatalogResponse> => {
+			const catalog = await repository.findById(id);
+
+			if (!catalog) {
+				throw new Error("Catálogo no encontrado");
+			}
+
+			if (catalog.archived) {
+				throw new Error("No se puede actualizar un catálogo archivado");
+			}
+
+			// Validar que no exista otro catálogo con el mismo nombre
+			if (request.name && request.name !== catalog.name) {
+				const existingCatalog = await repository.findByName(request.name);
+
+				if (
+					existingCatalog &&
+					existingCatalog.id !== id &&
+					!existingCatalog.archived
+				) {
+					throw new Error("Ya existe un catálogo con ese nombre");
+				}
+			}
+
+			const catalogToUpdate: Partial<ICatalogModel> = {
+				name: catalogRequestValidator(request.name).name,
+				updated_at: new Date().toISOString(),
+			};
+
+			await repository.update(id, { ...catalogToUpdate });
+
+			return mapToResponse({ ...catalog, ...catalogToUpdate });
+		},
+
+		archiveCatalog: async (id: string): Promise<void> => {
+			const catalog = await repository.findById(id);
+
+			if (!catalog) {
+				throw new Error("Catálogo no encontrado");
+			}
+
+			if (catalog.archived) {
+				throw new Error("El catálogo ya está archivado");
+			}
+
+			await repository.update(id, {
+				archived: true,
+				updated_at: new Date().toISOString(),
+			});
+		},
+
+		restoreCatalog: async (id: string): Promise<void> => {
+			const catalog = await repository.findById(id);
+			if (!catalog) {
+				throw new Error("Catálogo no encontrado");
+			}
+
+			if (!catalog.archived) {
+				throw new Error("El catálogo no está archivado");
+			}
+
+			await repository.update(id, {
+				archived: false,
+				updated_at: new Date().toISOString(),
+			});
+		},
+
+		deleteCatalog: async (id: string): Promise<void> => {
+			const catalog = await repository.findById(id);
+			if (!catalog) {
+				throw new Error("Catálogo no encontrado");
+			}
+
+			await repository.delete(id);
+		},
+
+		getCatalogStats: async (): Promise<{
+			total: number;
+			active: number;
+			archived: number;
+		}> => {
+			const [total, active] = await Promise.all([
+				repository.count(true),
+				repository.count(false),
+			]);
+
+			return {
+				total,
+				active,
+				archived: total - active,
+			};
+		},
 	};
 };
 
-const mapperToList = (
-	results: Array<
-		| PartialPageObjectResponse
-		| PageObjectResponse
-		| PartialDatabaseObjectResponse
-		| DatabaseObjectResponse
-	>
-): CatalogModel[] => {
-	return results.map((result) => mapperToObject(result as GetPageResponse));
+export interface ICatalogService {
+	createCatalog: (request: ICatalogRequest) => Promise<ICatalogResponse>;
+	getAllCatalogs: (includeArchived?: boolean) => Promise<ICatalogResponse[]>;
+	getCatalogById: (id: string) => Promise<ICatalogResponse>;
+	updateCatalog: (
+		id: string,
+		request: ICatalogRequest
+	) => Promise<ICatalogResponse>;
+	archiveCatalog: (id: string) => Promise<void>;
+	restoreCatalog: (id: string) => Promise<void>;
+	getCatalogStats: () => Promise<{
+		total: number;
+		active: number;
+		archived: number;
+	}>;
+	deleteCatalog: (id: string) => Promise<void>;
+}
+
+const mapToResponse = (catalog: ICatalogModel): ICatalogResponse => {
+	return {
+		id: catalog.id as string,
+		name: catalog.name,
+		created_at: catalog.created_at,
+		updated_at: catalog.updated_at,
+		archived: catalog.archived,
+	};
 };
