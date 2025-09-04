@@ -1,5 +1,5 @@
-export interface CampaignModel {
-	id: string;
+export interface ICampaignModel {
+	id?: string;
 	name: string;
 	start_date: string;
 	end_date: string;

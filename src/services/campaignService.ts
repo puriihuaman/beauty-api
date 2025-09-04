@@ -1,214 +1,173 @@
+import type { ICampaignModel } from "../domain/model/index.ts";
 import {
-	Client,
-	type DatabaseObjectResponse,
-	type GetPageResponse,
-	type PageObjectResponse,
-	type PartialDatabaseObjectResponse,
-	type PartialPageObjectResponse,
-} from "@notionhq/client";
-import type { CampaignRequestDto } from "../dto/index.ts";
-import type { CampaignModel } from "../model/index.ts";
-import { ClientError } from "../utils/index.ts";
-import { getACatalog } from "./catalogService.ts";
+	campaignRequestValidator,
+	type ICampaignRequest,
+	type ICampaignResponse,
+} from "../dto/index.ts";
+import { NotionClientError } from "../errors/index.ts";
+import type { ICampaignRepository } from "../repository/index.ts";
 import {
 	addCatalogCampaign,
 	editCatalogCampaign,
 } from "./catalogCampaignService.ts";
+import { type ICatalogService } from "./catalogService.ts";
 
-const notion = new Client({ auth: process.env.NOTION_TOKEN as string });
-
-const CAMPAIGN_PROPERTIES = {
-	NAME: "NAME",
-	START_DATE: "START_DATE",
-	END_DATE: "END_DATE",
-	CREATED_AT: "CREATED_AT",
-	UPDATED_AT: "UPDATED_AT",
-};
-
-export const getAllCampaign = async () => {
-	const { results } = await notion.databases.query({
-		database_id: process.env.NOTION_CAMPAIGNS_DB_ID as string,
-	});
-	return mapperToList(results);
-};
-
-export const getACampaign = async (campaignId: string) => {
-	const response = await notion.pages.retrieve({ page_id: campaignId });
-
-	return mapperToObject(response);
-};
-
-export const addCampaign = async (campaign: CampaignRequestDto) => {
-	const existing = await notion.databases.query({
-		database_id: process.env.NOTION_CAMPAIGNS_DB_ID as string,
-		filter: {
-			property: CAMPAIGN_PROPERTIES.NAME,
-			title: { equals: campaign.name },
-		},
-	});
-
-	if (existing.results.length > 0) {
-		throw new ClientError(
-			"Ya existe una campaña",
-			409,
-			"No puede haber campañas duplicadas"
-		);
-	}
-
-	const catalog = await getACatalog(campaign.catalog_id);
-
-	const currentTime = new Date().toISOString();
-
-	const response = await notion.pages.create({
-		parent: { database_id: process.env.NOTION_CAMPAIGNS_DB_ID as string },
-		properties: {
-			[CAMPAIGN_PROPERTIES.NAME]: {
-				title: [{ text: { content: campaign.name } }],
-			},
-			[CAMPAIGN_PROPERTIES.START_DATE]: {
-				date: { start: campaign.start_date },
-			},
-			[CAMPAIGN_PROPERTIES.END_DATE]: { date: { start: campaign.end_date } },
-			[CAMPAIGN_PROPERTIES.CREATED_AT]: { date: { start: currentTime } },
-			[CAMPAIGN_PROPERTIES.UPDATED_AT]: { date: { start: currentTime } },
-		},
-	});
-
-	await addCatalogCampaign({
-		campaign_id: response.id,
-		catalog_id: catalog.id,
-	});
-
-	return mapperToObject(response);
-};
-
-export const editCampaign = async (campaign: CampaignRequestDto) => {
-	const currentCampaign = await notion.pages.retrieve({
-		page_id: campaign.id as string,
-	});
-
-	if (!currentCampaign.id) {
-		throw new ClientError(
-			"Campaña no encontrada",
-			404,
-			`No existe la campaña con el ID: ${campaign.id}`
-		);
-	}
-
-	const existing = await notion.databases.query({
-		database_id: process.env.NOTION_CAMPAIGNS_DB_ID as string,
-		filter: {
-			property: CAMPAIGN_PROPERTIES.NAME,
-			title: { equals: campaign.name },
-		},
-	});
-
-	if (existing.results.length > 1) {
-		throw new ClientError(
-			"Ya existe una campaña con este nombre",
-			409,
-			"No puede haber campañas duplicadas"
-		);
-	}
-
-	const catalog = await getACatalog(campaign.catalog_id);
-
-	const currentTime = new Date().toISOString();
-	const response = await notion.pages.update({
-		page_id: campaign.id as string,
-		properties: {
-			[CAMPAIGN_PROPERTIES.NAME]: {
-				title: [{ text: { content: campaign.name } }],
-			},
-			[CAMPAIGN_PROPERTIES.START_DATE]: {
-				date: { start: campaign.start_date },
-			},
-			[CAMPAIGN_PROPERTIES.END_DATE]: { date: { start: campaign.end_date } },
-			[CAMPAIGN_PROPERTIES.UPDATED_AT]: { date: { start: currentTime } },
-		},
-	});
-
-	await editCatalogCampaign({
-		id: campaign.catalog_campaign_id as string,
-		campaign_id: response.id,
-		catalog_id: catalog.id,
-	});
-
-	return mapperToObject(response);
-};
-
-export const removeCampaign = async (campaignId: string) => {
-	const responseCurrent = await notion.pages.retrieve({ page_id: campaignId });
-
-	if (!responseCurrent) {
-		throw new ClientError(
-			"Campaña no encontrada",
-			404,
-			`No existe la campaña con el ID: ${campaignId}`
-		);
-	}
-
-	const response = await notion.pages.update({
-		page_id: campaignId,
-		archived: true,
-		in_trash: true,
-	});
-
-	return mapperToObject(response);
-};
-
-const mapperToObject = (result: GetPageResponse): CampaignModel => {
-	if (!("properties" in result)) {
-		throw new Error("El objeto no contiene properties");
-	}
-
-	const properties = result.properties;
-	const archived = result.archived;
-
-	if (!properties.NAME || !("title" in properties.NAME)) {
-		throw new Error(
-			"El objeto properties.NAME es undefined o no contiene title"
-		);
-	}
-
-	if (
-		!properties.CREATED_AT ||
-		!("created_time" in properties.CREATED_AT) ||
-		!properties.UPDATED_AT ||
-		!("last_edited_time" in properties.UPDATED_AT) ||
-		!properties.START_DATE ||
-		!("date" in properties.START_DATE) ||
-		!properties.END_DATE ||
-		!("date" in properties.END_DATE)
-	) {
-		throw new Error(
-			"El objeto properties.CREATED_AT es undefined o no contiene la fecha"
-		);
-	}
-
-	const { NAME, START_DATE, END_DATE, CREATED_AT, UPDATED_AT } = properties;
-
-	const textContent =
-		NAME.title.length >= 0 ? NAME.title[0]?.plain_text ?? "" : "";
-
+export const campaignService = (
+	repository: ICampaignRepository,
+	catalogService: ICatalogService
+): ICampaignService => {
 	return {
-		id: result.id,
-		name: textContent,
-		start_date: START_DATE.date?.start as string,
-		end_date: END_DATE.date?.start as string,
-		created_at: CREATED_AT.created_time,
-		updated_at: UPDATED_AT.last_edited_time,
-		archived,
+		getAllCampaigns: async (): Promise<ICampaignResponse[]> => {
+			const campaigns = await repository.findAll();
+
+			return campaigns.map((campaign) => mapToResponse(campaign));
+		},
+
+		getCampaignById: async (campaignId: string) => {
+			const campaign = await repository.findById(campaignId);
+
+			if (!campaign) {
+				throw new NotionClientError(
+					"Campaña no encontrada",
+					404,
+					"No se puedo encontrar la campaña con el ID proporcionado",
+					"buscar campaña por ID"
+				);
+			}
+
+			return mapToResponse(campaign);
+		},
+
+		createCampaign: async (
+			request: ICampaignRequest
+		): Promise<ICampaignResponse> => {
+			const existingCampaign = await repository.findByName(request.name);
+
+			if (existingCampaign && !existingCampaign.archived) {
+				throw new NotionClientError(
+					"Ya existe la campaña",
+					409,
+					"No puede existir mas de una campaña con el mismo nombre",
+					"buscar campaña"
+				);
+			}
+
+			const catalog = await catalogService.getCatalogById(request.catalog_id);
+
+			const currentTime = new Date().toISOString();
+			const campaign: ICampaignModel = {
+				name: campaignRequestValidator(request).name,
+				start_date: request.start_date,
+				end_date: request.end_date,
+				archived: false,
+				created_at: currentTime,
+				updated_at: currentTime,
+			};
+
+			const id = await repository.save(campaign);
+			campaign.id = id;
+
+			// Aquí usar el servicio de catalog campaign
+			await addCatalogCampaign({
+				campaign_id: id,
+				catalog_id: catalog.id,
+			});
+
+			return mapToResponse(campaign);
+		},
+
+		updateCampaign: async (
+			id: string,
+			request: ICampaignRequest
+		): Promise<ICampaignResponse> => {
+			const currentCampaign = await repository.findById(id);
+
+			if (!currentCampaign) {
+				throw new NotionClientError(
+					"Campaña no encontrada",
+					404,
+					"No se puedo encontrar la campaña con el ID proporcionado",
+					"buscar campaña por ID"
+				);
+			}
+
+			if (currentCampaign.archived) {
+				throw new NotionClientError(
+					"No se pudo actualizar",
+					500,
+					"No se puede actualizar una campaña archivada",
+					"actualizar campaña"
+				);
+			}
+
+			if (request.name && request.name !== currentCampaign.name) {
+				const existing = await repository.findByName(request.name);
+
+				if (existing && existing.id !== id && !existing.archived) {
+					throw new NotionClientError(
+						"Ya existe la campaña",
+						409,
+						"No puede existir mas de una campaña con el mismo nombre",
+						"buscar campaña"
+					);
+				}
+			}
+
+			const catalog = await catalogService.getCatalogById(request.catalog_id);
+
+			const campaignToUpdate: Partial<ICampaignModel> = {
+				name: campaignRequestValidator(request).name,
+				updated_at: new Date().toISOString(),
+			};
+
+			await repository.update(id, campaignToUpdate);
+
+			// Aquí usar el servicio de catalog campaign
+			await editCatalogCampaign({
+				id: request.catalog_campaign_id as string,
+				campaign_id: id,
+				catalog_id: catalog.id,
+			});
+
+			return mapToResponse({ ...currentCampaign, ...campaignToUpdate });
+		},
+
+		deleteCampaign: async (campaignId: string) => {
+			const campaign = await repository.findById(campaignId);
+
+			if (!campaign) {
+				throw new NotionClientError(
+					"Campaña no encontrada",
+					404,
+					"No se puedo encontrar la campaña con el ID proporcionado",
+					"buscar campaña por ID"
+				);
+			}
+
+			await repository.delete(campaignId);
+		},
 	};
 };
 
-const mapperToList = (
-	results: Array<
-		| PartialPageObjectResponse
-		| PageObjectResponse
-		| PartialDatabaseObjectResponse
-		| DatabaseObjectResponse
-	>
-): CampaignModel[] => {
-	return results.map((result) => mapperToObject(result as GetPageResponse));
+export interface ICampaignService {
+	createCampaign: (request: ICampaignRequest) => Promise<ICampaignResponse>;
+	getAllCampaigns: () => Promise<ICampaignResponse[]>;
+	getCampaignById: (id: string) => Promise<ICampaignResponse>;
+	updateCampaign: (
+		id: string,
+		request: ICampaignRequest
+	) => Promise<ICampaignResponse>;
+	deleteCampaign: (id: string) => Promise<void>;
+}
+
+const mapToResponse = (campaign: ICampaignModel): ICampaignResponse => {
+	return {
+		id: campaign.id as string,
+		name: campaign.name,
+		start_date: campaign.start_date,
+		end_date: campaign.end_date,
+		created_at: campaign.created_at,
+		updated_at: campaign.updated_at,
+		archived: campaign.archived,
+	};
 };

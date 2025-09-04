@@ -1,11 +1,11 @@
-import type { CampaignModel } from "./campaignModel.ts";
-import type { CatalogModel } from "./catalogModel.ts";
+import type { ICampaignModel } from "./campaignModel.ts";
+import type { ICatalogModel } from "./catalogModel.ts";
 
 export interface CatalogCampaignModel {
 	id: string;
 	code: string;
-	campaign_id: CampaignModel["id"];
-	catalog_id: CatalogModel["id"];
+	campaign_id: ICampaignModel["id"];
+	catalog_id: ICatalogModel["id"];
 	created_at: string;
 	updated_at: string;
 	archived: boolean;
