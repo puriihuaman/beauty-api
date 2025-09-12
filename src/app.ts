@@ -2,12 +2,22 @@ import { Client } from "@notionhq/client";
 import type { Application, NextFunction, Request, Response } from "express";
 import express, { json } from "express";
 import { env } from "./config/environment.ts";
-import { catalogController } from "./controllers/index.ts";
+import { campaignController, catalogController } from "./controllers/index.ts";
+import {
+	handleError,
+	type ClientError,
+	type ServerError,
+	type UnauthorizedError,
+} from "./errors/index.ts";
 import { corsMiddleware } from "./middleware/index.ts";
-import { notionCatalogoRepository } from "./repository/notion/notionCatalogoRepository.ts";
-import { catalogRouter } from "./routes/v1/index.ts";
+import {
+	notionCampaignRepository,
+	notionCatalogoRepository,
+} from "./repository/index.ts";
+import { campaignRouter } from "./routes/index.ts";
+import { catalogRouter } from "./routes/index.ts";
+import { campaignService } from "./services/index.ts";
 import { catalogService } from "./services/index.ts";
-import { ClientError, handleError, ServerError } from "./utils/index.ts";
 
 export const createApp = (): Application => {
 	const app = express();
@@ -19,20 +29,28 @@ export const createApp = (): Application => {
 
 	const notionClient = new Client({ auth: env.NOTION_TOKEN });
 
-	const repository = notionCatalogoRepository(notionClient, env.NOTION_CATALOG);
+	const catalogRepo = notionCatalogoRepository(
+		notionClient,
+		env.NOTION_CATALOG
+	);
+	const catalogServe = catalogService(catalogRepo);
+	const catalogCtr = catalogController(catalogServe);
 
-	const service = catalogService(repository);
-	const controller = catalogController(service);
+	const campaignRepo = notionCampaignRepository(
+		notionClient,
+		env.NOTION_CAMPAIGN
+	);
+	const campaignServe = campaignService(campaignRepo, catalogServe);
+	const campaignCtr = campaignController(campaignServe);
 
 	const CONTEXT_PATH = `/api/v1/webhook`;
 
-	const catalogRoutes = catalogRouter(controller);
-
-	app.use(`${CONTEXT_PATH}/catalogs`, catalogRoutes);
+	app.use(`${CONTEXT_PATH}/catalogs`, catalogRouter(catalogCtr));
+	app.use(`${CONTEXT_PATH}/campaigns`, campaignRouter(campaignCtr));
 
 	app.use(
 		(
-			error: ClientError | ServerError,
+			error: UnauthorizedError | ClientError | ServerError,
 			req: Request,
 			res: Response,
 			next: NextFunction

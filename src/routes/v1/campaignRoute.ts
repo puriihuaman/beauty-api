@@ -1,22 +1,28 @@
-import {
-	createCampaign,
-	deleteCampaign,
-	getAllCampaigns,
-	getCampaignById,
-	updateCampaign,
-} from "../../controllers/index.ts";
 import { Router } from "express";
+import type { ICampaignController } from "../../controllers/index.ts";
 
-const campaignRouter = Router();
+export const campaignRouter = (
+	campaignController: ICampaignController
+): Router => {
+	const {
+		getAllCampaigns,
+		getCampaignById,
+		createCampaign,
+		updateCampaign,
+		deleteCampaign,
+	} = campaignController;
 
-campaignRouter.get("/", getAllCampaigns);
+	const campaignRouter = Router();
 
-campaignRouter.get("/:id", getCampaignById);
+	campaignRouter.get("/", getAllCampaigns);
 
-campaignRouter.post("/create", createCampaign);
+	campaignRouter.get("/:id", getCampaignById);
 
-campaignRouter.put("/update/:id", updateCampaign);
+	campaignRouter.post("/create", createCampaign);
 
-campaignRouter.delete("/delete/:id", deleteCampaign);
+	campaignRouter.put("/update/:id", updateCampaign);
 
-export { campaignRouter };
+	campaignRouter.delete("/delete/:id", deleteCampaign);
+
+	return campaignRouter;
+};
