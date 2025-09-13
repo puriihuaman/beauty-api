@@ -4,7 +4,8 @@ import {
 	type ICatalogRequest,
 	type ICatalogResponse,
 } from "../dto/index.ts";
-import type { ICatalogRepository } from "../repository/interface/catalogRepository.ts";
+import { NotionClientError } from "../errors/index.ts";
+import type { ICatalogRepository } from "../repository/index.ts";
 
 export const catalogService = (
 	repository: ICatalogRepository
@@ -14,22 +15,24 @@ export const catalogService = (
 			request: ICatalogRequest
 		): Promise<ICatalogResponse> => {
 			const existingCatalog = await repository.findByName(request.name);
+
 			if (existingCatalog && !existingCatalog.archived) {
-				throw new Error("Ya existe un catálogo con ese nombre");
+				throw new NotionClientError(
+					"Ya existe el catálogo",
+					409,
+					"No puede existir más de un catalogo con el mismo nombre",
+					"crear catálogo"
+				);
 			}
 
-			const currentTime = new Date().toISOString();
-			const catalog: ICatalogModel = {
+			const catalog: ICatalogRequest = {
 				name: catalogRequestValidator(request.name).name,
-				created_at: currentTime,
-				updated_at: currentTime,
 				archived: false,
 			};
 
-			const id = await repository.save(catalog);
-			catalog.id = id;
+			const createdCatalog = await repository.save(catalog);
 
-			return mapToResponse(catalog);
+			return mapToResponse(createdCatalog);
 		},
 
 		getAllCatalogs: async (
@@ -40,91 +43,133 @@ export const catalogService = (
 			return catalogs.map((catalog) => mapToResponse(catalog));
 		},
 
-		getCatalogById: async (id: string): Promise<ICatalogResponse> => {
-			const catalog = await repository.findById(id);
+		getCatalogById: async (
+			catalogId: ICatalogModel["id"]
+		): Promise<ICatalogResponse> => {
+			const catalog = await repository.findById(catalogId);
+
 			if (!catalog) {
-				throw new Error("Catálogo no encontrado");
+				throw new NotionClientError(
+					"Catálogo no encontrado",
+					404,
+					"No se pudo encontrar el catálogo con el ID proporcionado",
+					"buscar catálogo por ID"
+				);
 			}
+
 			return mapToResponse(catalog);
 		},
 
 		updateCatalog: async (
-			id: string,
+			catalogId: ICatalogModel["id"],
 			request: ICatalogRequest
 		): Promise<ICatalogResponse> => {
-			const catalog = await repository.findById(id);
+			const catalog = await repository.findById(catalogId);
 
 			if (!catalog) {
-				throw new Error("Catálogo no encontrado");
+				throw new NotionClientError(
+					"Catálogo no encontrado",
+					404,
+					"No se pudo encontrar el catálogo con el ID proporcionado",
+					"buscar catálogo por ID"
+				);
 			}
 
 			if (catalog.archived) {
-				throw new Error("No se puede actualizar un catálogo archivado");
+				throw new NotionClientError(
+					"No se pudo actualizar",
+					500,
+					"No se puede actualizar un catálogo archivado",
+					"actualizar catálogo"
+				);
 			}
 
-			// Validar que no exista otro catálogo con el mismo nombre
 			if (request.name && request.name !== catalog.name) {
 				const existingCatalog = await repository.findByName(request.name);
 
 				if (
 					existingCatalog &&
-					existingCatalog.id !== id &&
+					existingCatalog.id !== catalogId &&
 					!existingCatalog.archived
 				) {
-					throw new Error("Ya existe un catálogo con ese nombre");
+					throw new NotionClientError(
+						"Ya existe un catálogo",
+						409,
+						"No puede existir más de un catálogo con el mismo nombre",
+						"buscar catálogo"
+					);
 				}
 			}
 
-			const catalogToUpdate: Partial<ICatalogModel> = {
+			const catalogToUpdate: ICatalogRequest = {
 				name: catalogRequestValidator(request.name).name,
-				updated_at: new Date().toISOString(),
 			};
 
-			await repository.update(id, { ...catalogToUpdate });
+			await repository.update(catalogId, { ...catalogToUpdate });
 
 			return mapToResponse({ ...catalog, ...catalogToUpdate });
 		},
 
-		archiveCatalog: async (id: string): Promise<void> => {
-			const catalog = await repository.findById(id);
+		archiveCatalog: async (catalogId: string): Promise<void> => {
+			const catalog = await repository.findById(catalogId);
 
 			if (!catalog) {
-				throw new Error("Catálogo no encontrado");
+				throw new NotionClientError(
+					"Catálogo no encontrado",
+					404,
+					"No se pudo encontrar el catálogo con el ID proporcionado",
+					"buscar catálogo por ID"
+				);
 			}
 
 			if (catalog.archived) {
-				throw new Error("El catálogo ya está archivado");
+				throw new NotionClientError(
+					"No se pudo archivar",
+					500,
+					"No se puede archivar un catálogo que ya está archivado",
+					"archivar catálogo"
+				);
 			}
 
-			await repository.update(id, {
-				archived: true,
-				updated_at: new Date().toISOString(),
-			});
+			await repository.update(catalogId, { archived: true });
 		},
 
-		restoreCatalog: async (id: string): Promise<void> => {
-			const catalog = await repository.findById(id);
+		restoreCatalog: async (catalogId: string): Promise<void> => {
+			const catalog = await repository.findById(catalogId);
 			if (!catalog) {
-				throw new Error("Catálogo no encontrado");
+				throw new NotionClientError(
+					"Catálogo no encontrado",
+					404,
+					"No se pudo encontrar el catálogo con el ID proporcionado",
+					"buscar catálogo por ID"
+				);
 			}
 
 			if (!catalog.archived) {
-				throw new Error("El catálogo no está archivado");
+				throw new NotionClientError(
+					"No se pudo restaurar",
+					500,
+					"No se puede restaurar un catálogo que no está archivado",
+					"restaurar catálogo"
+				);
 			}
 
-			await repository.update(id, {
-				archived: false,
-				updated_at: new Date().toISOString(),
-			});
+			await repository.update(catalogId, { archived: false });
 		},
 
-		deleteCatalog: async (id: string): Promise<void> => {
-			const catalog = await repository.findById(id);
+		deleteCatalog: async (catalogId: ICatalogModel["id"]): Promise<void> => {
+			const catalog = await repository.findById(catalogId);
+
 			if (!catalog) {
-				throw new Error("Catálogo no encontrado");
+				throw new NotionClientError(
+					"Catálogo no encontrado",
+					404,
+					"No se pudo encontrar el catálogo con el ID proporcionado",
+					"buscar catálogo por ID"
+				);
 			}
 
-			await repository.delete(id);
+			await repository.delete(catalogId);
 		},
 
 		getCatalogStats: async (): Promise<{
@@ -149,27 +194,27 @@ export const catalogService = (
 export interface ICatalogService {
 	createCatalog: (request: ICatalogRequest) => Promise<ICatalogResponse>;
 	getAllCatalogs: (includeArchived?: boolean) => Promise<ICatalogResponse[]>;
-	getCatalogById: (id: string) => Promise<ICatalogResponse>;
+	getCatalogById: (catalogId: ICatalogModel["id"]) => Promise<ICatalogResponse>;
 	updateCatalog: (
-		id: string,
+		catalogId: ICatalogModel["id"],
 		request: ICatalogRequest
 	) => Promise<ICatalogResponse>;
-	archiveCatalog: (id: string) => Promise<void>;
-	restoreCatalog: (id: string) => Promise<void>;
+	archiveCatalog: (catalogId: ICatalogModel["id"]) => Promise<void>;
+	restoreCatalog: (catalogId: ICatalogModel["id"]) => Promise<void>;
 	getCatalogStats: () => Promise<{
 		total: number;
 		active: number;
 		archived: number;
 	}>;
-	deleteCatalog: (id: string) => Promise<void>;
+	deleteCatalog: (catalogId: ICatalogModel["id"]) => Promise<void>;
 }
 
 const mapToResponse = (catalog: ICatalogModel): ICatalogResponse => {
 	return {
-		id: catalog.id as string,
+		id: catalog.id,
 		name: catalog.name,
-		created_at: catalog.created_at,
-		updated_at: catalog.updated_at,
+		createdAt: catalog.createdAt,
+		updatedAt: catalog.updatedAt,
 		archived: catalog.archived,
 	};
 };

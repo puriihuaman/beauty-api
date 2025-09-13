@@ -1,5 +1,6 @@
 export interface ICatalogRequest {
 	name: string;
+	archived?: boolean;
 }
 
 export const catalogRequestValidator = (data: any): ICatalogRequest => {
@@ -17,5 +18,5 @@ export const catalogRequestValidator = (data: any): ICatalogRequest => {
 		throw new Error("El nombre no puede exceder 100 caracteres");
 	}
 
-	return { name: cleanName };
+	return { name: cleanName, archived: data?.archived };
 };

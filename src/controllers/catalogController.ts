@@ -7,30 +7,18 @@ export const catalogController = (
 	service: ICatalogService
 ): ICatalogController => {
 	return {
-		createCatalog: async (
-			req: Request,
-			res: Response,
-			next: NextFunction
-		): Promise<void> => {
+		createCatalog: async (req, res, next) => {
 			try {
 				const request = catalogRequestValidator(req.body);
 				const catalog = await service.createCatalog(request);
 
-				res.status(201).json({
-					success: true,
-					data: catalog,
-					message: "Catálogo creado exitosamente",
-				});
+				handleResponse(res, 201, catalog, "Catálogo creado con éxito");
 			} catch (error) {
 				next(error);
 			}
 		},
 
-		getAllCatalogs: async (
-			req: Request,
-			res: Response,
-			next: NextFunction
-		): Promise<void> => {
+		getAllCatalogs: async (req, res, next) => {
 			try {
 				const includeArchived = req.query.includeArchived === "true";
 				const catalogs = await service.getAllCatalogs(includeArchived);
@@ -41,14 +29,11 @@ export const catalogController = (
 			}
 		},
 
-		getCatalogById: async (
-			req: Request,
-			res: Response,
-			next: NextFunction
-		): Promise<void> => {
+		getCatalogById: async (req, res, next) => {
 			try {
-				const { id } = req.params;
-				const catalog = await service.getCatalogById(id as string);
+				const id = req.params.id as string;
+
+				const catalog = await service.getCatalogById(id);
 
 				handleResponse(res, 200, catalog, "Catálogo recuperado");
 			} catch (error) {
@@ -56,15 +41,11 @@ export const catalogController = (
 			}
 		},
 
-		updateCatalog: async (
-			req: Request,
-			res: Response,
-			next: NextFunction
-		): Promise<void> => {
+		updateCatalog: async (req, res, next) => {
 			try {
-				const { id } = req.params;
+				const id = req.params.id as string;
 				const request = catalogRequestValidator(req.body);
-				const catalog = await service.updateCatalog(id as string, request);
+				const catalog = await service.updateCatalog(id, request);
 
 				handleResponse(res, 200, catalog, "Catálogo actualizado con éxito");
 			} catch (error) {
@@ -72,14 +53,10 @@ export const catalogController = (
 			}
 		},
 
-		archiveCatalog: async (
-			req: Request,
-			res: Response,
-			next: NextFunction
-		): Promise<void> => {
+		archiveCatalog: async (req, res, next) => {
 			try {
-				const { id } = req.params;
-				const catalog = await service.archiveCatalog(id as string);
+				const id = req.params.id as string;
+				const catalog = await service.archiveCatalog(id);
 
 				handleResponse(res, 200, catalog, "Catálogo archivado con éxito");
 			} catch (error) {
@@ -87,14 +64,10 @@ export const catalogController = (
 			}
 		},
 
-		restoreCatalog: async (
-			req: Request,
-			res: Response,
-			next: NextFunction
-		): Promise<void> => {
+		restoreCatalog: async (req, res, next) => {
 			try {
-				const { id } = req.params;
-				await service.restoreCatalog(id as string);
+				const id = req.params.id as string;
+				await service.restoreCatalog(id);
 
 				handleResponse(res, 200, null, "Catálogo restaurado con éxito");
 			} catch (error) {
@@ -102,14 +75,10 @@ export const catalogController = (
 			}
 		},
 
-		deleteCatalog: async (
-			req: Request,
-			res: Response,
-			next: NextFunction
-		): Promise<void> => {
+		deleteCatalog: async (req, res, next) => {
 			try {
-				const { id } = req.params;
-				await service.deleteCatalog(id as string);
+				const id = req.params.id as string;
+				await service.deleteCatalog(id);
 
 				handleResponse(res, 200, null, "Catálogo eliminado con éxito");
 			} catch (error) {
@@ -117,11 +86,7 @@ export const catalogController = (
 			}
 		},
 
-		getCatalogStats: async (
-			req: Request,
-			res: Response,
-			next: NextFunction
-		): Promise<void> => {
+		getCatalogStats: async (req, res, next) => {
 			try {
 				const stats = await service.getCatalogStats();
 
