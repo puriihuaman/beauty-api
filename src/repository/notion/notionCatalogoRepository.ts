@@ -1,4 +1,5 @@
 import {
+	APIErrorCode,
 	Client,
 	type DatabaseObjectResponse,
 	type GetPageResponse,
@@ -8,28 +9,32 @@ import {
 } from "@notionhq/client";
 import type { ICatalogModel } from "../../domain/model/index.ts";
 import type { ICatalogRepository } from "../interface/catalogRepository.ts";
+import { mapNotionError } from "../../errors/mapNotionError.ts";
+import type { ICatalogRequest } from "../../dto/index.ts";
+
+const CATALOG_PROPERTIES = { NAME: "Name" };
 
 export const notionCatalogoRepository = (
 	notionClient: Client,
 	databaseId: string
 ): ICatalogRepository => {
 	return {
-		findById: async (id: string): Promise<ICatalogModel | null> => {
+		findById: async (
+			id: ICatalogModel["id"]
+		): Promise<ICatalogModel | null> => {
 			try {
-				const response: GetPageResponse = await notionClient.pages.retrieve({
-					page_id: id,
-				});
+				const response = await notionClient.pages.retrieve({ page_id: id });
 
-				if (!("properties" in response)) {
-					return null;
-				}
-
-				return mapFromNotionPage(response as any);
+				return mapFromNotionPage(response);
 			} catch (error: any) {
-				if (error.code === "object_not_found") {
-					return null;
+				if (error.code === APIErrorCode.ValidationError) {
+					throw mapNotionError(
+						error,
+						"El ID del catálogo es inválido o tiene el formato incorrecto"
+					);
 				}
-				throw new Error(`Error al buscar catálogo por ID: ${error.message}`);
+
+				throw mapNotionError(error, "buscar catálogo por ID");
 			}
 		},
 
@@ -61,103 +66,62 @@ export const notionCatalogoRepository = (
 					mapFromNotionPage(page as GetPageResponse)
 				);
 			} catch (error: any) {
-				throw new Error(`Error al obtener catálogos: ${error.message}`);
+				throw mapNotionError(error, "buscar catálogos");
 			}
 		},
 
-		findByName: async (name: string): Promise<ICatalogModel | null> => {
+		findByName: async (
+			name: ICatalogModel["name"]
+		): Promise<ICatalogModel | null> => {
 			try {
 				const response = await notionClient.databases.query({
 					database_id: databaseId,
 					filter: {
-						property: "name",
-						title: {
-							equals: name,
-						},
+						property: CATALOG_PROPERTIES.NAME,
+						title: { equals: name },
 					},
 				});
 
-				if (response.results.length === 0) {
-					return null;
-				}
+				if (response.results.length === 0) return null;
 
 				return mapFromNotionPage(response.results[0] as GetPageResponse);
 			} catch (error: any) {
-				throw new Error(
-					`Error al buscar catálogo por nombre: ${error.message}`
-				);
+				throw mapNotionError(error, "buscar catálogo por nombre");
 			}
 		},
 
-		save: async (catalogo: ICatalogModel): Promise<string> => {
+		save: async (catalog: ICatalogRequest): Promise<ICatalogModel> => {
 			try {
 				const response = await notionClient.pages.create({
-					parent: {
-						database_id: databaseId,
-					},
+					parent: { database_id: databaseId },
 					properties: {
-						name: {
-							title: [
-								{
-									text: {
-										content: catalogo.name,
-									},
-								},
-							],
-						},
-						created_at: {
-							date: {
-								start: catalogo.created_at,
-							},
-						},
-						updated_at: {
-							date: {
-								start: catalogo.updated_at,
-							},
-						},
-						archived: {
-							checkbox: catalogo.archived,
+						[CATALOG_PROPERTIES.NAME]: {
+							title: [{ text: { content: catalog.name } }],
 						},
 					},
 				});
 
-				return response.id;
+				return mapFromNotionPage(response);
 			} catch (error: any) {
-				throw new Error(`Error al guardar catálogo: ${error.message}`);
+				throw mapNotionError(error, "guardar catálogo");
 			}
 		},
 
 		update: async (
-			id: string,
-			updates: Partial<ICatalogModel>
+			id: ICatalogModel["id"],
+			client: Partial<ICatalogRequest>
 		): Promise<void> => {
 			try {
-				const properties: any = {};
+				const properties: { [key: string]: any } = {};
 
-				if (updates.name) {
-					properties.name = {
-						title: [
-							{
-								text: {
-									content: updates.name,
-								},
-							},
-						],
+				if (client.name) {
+					properties[CATALOG_PROPERTIES.NAME] = {
+						title: [{ text: { content: client.name } }],
 					};
 				}
 
-				if (updates.updated_at) {
-					properties.updated_at = {
-						date: {
-							start: updates.updated_at,
-						},
-					};
-				}
-
-				if (updates.archived !== undefined) {
-					properties.archived = {
-						checkbox: updates.archived,
-					};
+				if (client.archived !== undefined) {
+					properties.archived = { checkbox: client.archived };
 				}
 
 				await notionClient.pages.update({
@@ -165,18 +129,19 @@ export const notionCatalogoRepository = (
 					properties,
 				});
 			} catch (error: any) {
-				throw new Error(`Error al actualizar catálogo: ${error.message}`);
+				throw mapNotionError(error, "actualizar catálogo");
 			}
 		},
 
-		delete: async (id: string): Promise<void> => {
+		delete: async (id: ICatalogModel["id"]): Promise<void> => {
 			try {
 				await notionClient.pages.update({
 					page_id: id,
 					archived: true,
+					in_trash: true,
 				});
 			} catch (error: any) {
-				throw new Error(`Error al eliminar catálogo: ${error.message}`);
+				throw mapNotionError(error, "eliminar catálogo");
 			}
 		},
 
@@ -198,7 +163,7 @@ export const notionCatalogoRepository = (
 
 				return response.results.length;
 			} catch (error: any) {
-				throw new Error(`Error al contar catálogos: ${error.message}`);
+				throw mapNotionError(error, "contar catálogos");
 			}
 		},
 	};
@@ -219,33 +184,33 @@ const mapFromNotionPage = (
 	}
 	const properties = page.properties;
 
-	if (!properties.NAME || !("title" in properties.NAME)) {
+	if (!properties.Name || !("title" in properties.Name)) {
 		throw new Error(
 			"El objeto properties.NAME es undefined o no contiene title"
 		);
 	}
 
 	if (
-		!properties.CREATED_AT ||
-		!("created_time" in properties.CREATED_AT) ||
-		!properties.UPDATED_AT ||
-		!("last_edited_time" in properties.UPDATED_AT)
+		!properties.Created_at ||
+		!("created_time" in properties.Created_at) ||
+		!properties.Updated_at ||
+		!("last_edited_time" in properties.Updated_at)
 	) {
 		throw new Error(
 			"El objeto properties.CREATED_AT es undefined o no contiene la fecha"
 		);
 	}
 
-	const { NAME, CREATED_AT, UPDATED_AT } = properties;
+	const { Name, Created_at, Updated_at } = properties;
 
 	const textContent =
-		NAME.title.length >= 0 ? NAME.title[0]?.plain_text ?? "" : "";
+		Name.title.length >= 0 ? Name.title[0]?.plain_text ?? "" : "";
 
 	return {
 		id: page.id,
 		name: textContent,
-		created_at: CREATED_AT.created_time,
-		updated_at: UPDATED_AT.last_edited_time,
+		createdAt: Created_at?.created_time,
+		updatedAt: Updated_at?.last_edited_time,
 		archived: page.archived || false,
 	};
 };
